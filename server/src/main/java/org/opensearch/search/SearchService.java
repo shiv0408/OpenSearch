@@ -656,7 +656,7 @@ public class SearchService extends AbstractLifecycleComponent implements IndexEv
             if (request.scroll() != null) {
                 decreaseScrollContexts = openScrollContexts::decrementAndGet;
                 if (openScrollContexts.incrementAndGet() > maxOpenScrollContext) {
-                    throw new OpenSearchException(
+                    throw new ScrollContextLimitException(
                         "Trying to create too many scroll contexts. Must be less than or equal to: [" +
                             maxOpenScrollContext + "]. " + "This limit can be set by changing the ["
                             + MAX_OPEN_SCROLL_CONTEXT.getKey() + "] setting.");
