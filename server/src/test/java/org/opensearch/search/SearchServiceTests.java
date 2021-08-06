@@ -575,7 +575,7 @@ public class SearchServiceTests extends OpenSearchSingleNodeTestCase {
         }
 
         final ShardScrollRequestTest request = new ShardScrollRequestTest(indexShard.shardId());
-        OpenSearchException ex = expectThrows(OpenSearchException.class,
+        ScrollContextLimitException ex = expectThrows(ScrollContextLimitException.class,
             () -> service.createAndPutReaderContext(
                 request, indexService, indexShard, indexShard.acquireSearcherSupplier(), randomBoolean()));
         assertEquals(
