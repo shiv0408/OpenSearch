@@ -163,6 +163,12 @@ public class ScriptCache {
      * is discarded - there can never be more water in the bucket than the size of the bucket.
      */
     void checkCompilationLimit() {
+        // Imitating that no token is left in the bucket and raising exception
+        throw new CircuitBreakingException("[script] Too many dynamic script compilations within, max: [" +
+            rate + "]; please use indexed, or scripts with parameters instead; " +
+            "this limit can be changed by the [" + contextRateSetting + "] setting",
+            CircuitBreaker.Durability.TRANSIENT);
+        /*
         if (rate.equals(UNLIMITED_COMPILATION_RATE)) {
             return;
         }
@@ -194,6 +200,7 @@ public class ScriptCache {
                 "this limit can be changed by the [" + contextRateSetting + "] setting",
                 CircuitBreaker.Durability.TRANSIENT);
         }
+         */
     }
 
     /**
