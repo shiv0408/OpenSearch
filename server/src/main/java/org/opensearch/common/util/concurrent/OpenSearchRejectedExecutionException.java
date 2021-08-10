@@ -43,17 +43,8 @@ public class OpenSearchRejectedExecutionException extends RejectedExecutionExcep
         this.isExecutorShutdown = isExecutorShutdown;
     }
 
-    public OpenSearchRejectedExecutionException(String message, Throwable cause, boolean isExecutorShutdown) {
-        super(message, cause);
-        this.isExecutorShutdown = isExecutorShutdown;
-    }
-
     public OpenSearchRejectedExecutionException(String message) {
         this(message, false);
-    }
-
-    public OpenSearchRejectedExecutionException(String message, Throwable cause) {
-        this(message, cause, false);
     }
 
     public OpenSearchRejectedExecutionException() {

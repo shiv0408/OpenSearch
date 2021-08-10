@@ -42,7 +42,6 @@ import org.opensearch.common.cache.RemovalListener;
 import org.opensearch.common.cache.RemovalNotification;
 import org.opensearch.common.collect.Tuple;
 import org.opensearch.common.unit.TimeValue;
-import org.opensearch.common.util.concurrent.OpenSearchRejectedExecutionException;
 
 import java.util.Map;
 import java.util.Objects;
@@ -131,9 +130,6 @@ public class ScriptCache {
             Throwable cause = executionException.getCause();
             if (cause instanceof ScriptException) {
                 throw (ScriptException) cause;
-            } else if (cause instanceof CircuitBreakingException) {
-                throw new OpenSearchRejectedExecutionException(
-                    "Failed to compile " + type + " script [" + id + "] using lang [" + lang + "]", cause);
             } else if (cause instanceof Exception) {
                 throw new GeneralScriptException("Failed to compile " + type + " script [" + id + "] using lang [" + lang + "]", cause);
             } else {
