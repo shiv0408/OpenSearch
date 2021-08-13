@@ -37,7 +37,6 @@ import org.opensearch.common.unit.TimeValue;
 import org.opensearch.rest.RestStatus;
 import org.opensearch.test.OpenSearchTestCase;
 
-import java.io.IOException;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
