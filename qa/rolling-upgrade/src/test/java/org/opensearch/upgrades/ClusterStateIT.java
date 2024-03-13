@@ -11,8 +11,11 @@ package org.opensearch.upgrades;
 import org.opensearch.client.Request;
 import org.opensearch.client.Response;
 
-public class ClusterStateIT extends AbstractRollingTestCase{
+import java.util.logging.LogManager;
+import java.util.logging.Logger;
 
+public class ClusterStateIT extends AbstractRollingTestCase{
+    private static final Logger logger = LogManager.getLogManager().getLogger("TESSTTTTT");
     public void testTemplateMetadataUpgrades() throws Exception {
         if (CLUSTER_TYPE == ClusterType.OLD) {
             String templateName = "my_template";
@@ -29,6 +32,6 @@ public class ClusterStateIT extends AbstractRollingTestCase{
         Request request = new Request("GET", "_cluster/state/metadata");
         Response response = client().performRequest(request);
 
-        System.out.println(response.toString());
+        logger.info(response.toString());
     }
 }
