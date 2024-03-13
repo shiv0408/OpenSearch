@@ -85,6 +85,8 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BiFunction;
 import java.util.stream.IntStream;
 
+import static org.hamcrest.CoreMatchers.is;
+import static org.hamcrest.CoreMatchers.nullValue;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.greaterThanOrEqualTo;
 import static org.hamcrest.Matchers.instanceOf;
@@ -95,6 +97,7 @@ public class AbstractSearchAsyncActionTests extends OpenSearchTestCase {
     private final List<Tuple<String, String>> resolvedNodes = new ArrayList<>();
     private final Set<ShardSearchContextId> releasedContexts = new CopyOnWriteArraySet<>();
     private ExecutorService executor;
+    private SearchRequestOperationsListener assertingListener;
     ThreadPool threadPool;
 
     @Before
@@ -103,6 +106,27 @@ public class AbstractSearchAsyncActionTests extends OpenSearchTestCase {
         super.setUp();
         executor = Executors.newFixedThreadPool(1);
         threadPool = new TestThreadPool(getClass().getName());
+        assertingListener = new SearchRequestOperationsListener() {
+            private volatile SearchPhase phase;
+
+            @Override
+            protected void onPhaseStart(SearchPhaseContext context) {
+                assertThat(phase, is(nullValue()));
+                phase = context.getCurrentPhase();
+            }
+
+            @Override
+            protected void onPhaseEnd(SearchPhaseContext context, SearchRequestContext searchRequestContext) {
+                assertThat(phase, is(context.getCurrentPhase()));
+                phase = null;
+            }
+
+            @Override
+            protected void onPhaseFailure(SearchPhaseContext context) {
+                assertThat(phase, is(context.getCurrentPhase()));
+                phase = null;
+            }
+        };
     }
 
     @After
@@ -127,6 +151,7 @@ public class AbstractSearchAsyncActionTests extends OpenSearchTestCase {
             listener,
             controlled,
             false,
+            false,
             expected,
             new SearchShardIterator(null, null, Collections.emptyList(), null)
         );
@@ -138,6 +163,7 @@ public class AbstractSearchAsyncActionTests extends OpenSearchTestCase {
         ActionListener<SearchResponse> listener,
         final boolean controlled,
         final boolean failExecutePhaseOnShard,
+        final boolean catchExceptionWhenExecutePhaseOnShard,
         final AtomicLong expected,
         final SearchShardIterator... shards
     ) {
@@ -178,7 +204,10 @@ public class AbstractSearchAsyncActionTests extends OpenSearchTestCase {
             results,
             request.getMaxConcurrentShardRequests(),
             SearchResponse.Clusters.EMPTY,
-            new SearchRequestContext(new SearchRequestOperationsListener.CompositeListener(List.of(), LogManager.getLogger()), request)
+            new SearchRequestContext(
+                new SearchRequestOperationsListener.CompositeListener(List.of(assertingListener), LogManager.getLogger()),
+                request
+            )
         ) {
             @Override
             protected SearchPhase getNextPhase(final SearchPhaseResults<SearchPhaseResult> results, SearchPhaseContext context) {
@@ -194,7 +223,15 @@ public class AbstractSearchAsyncActionTests extends OpenSearchTestCase {
                 if (failExecutePhaseOnShard) {
                     listener.onFailure(new ShardNotFoundException(shardIt.shardId()));
                 } else {
-                    listener.onResponse(new QuerySearchResult());
+                    if (catchExceptionWhenExecutePhaseOnShard) {
+                        try {
+                            listener.onResponse(new QuerySearchResult());
+                        } catch (Exception e) {
+                            listener.onFailure(e);
+                        }
+                    } else {
+                        listener.onResponse(new QuerySearchResult());
+                    }
                 }
             }
 
@@ -334,7 +371,7 @@ public class AbstractSearchAsyncActionTests extends OpenSearchTestCase {
         ClusterSettings clusterSettings = new ClusterSettings(Settings.EMPTY, ClusterSettings.BUILT_IN_CLUSTER_SETTINGS);
         SearchRequestStats testListener = new SearchRequestStats(clusterSettings);
 
-        final List<SearchRequestOperationsListener> requestOperationListeners = new ArrayList<>(List.of(testListener));
+        final List<SearchRequestOperationsListener> requestOperationListeners = List.of(testListener);
         SearchQueryThenFetchAsyncAction action = createSearchQueryThenFetchAsyncAction(requestOperationListeners);
         action.start();
         assertEquals(1, testListener.getPhaseCurrent(action.getSearchPhaseName()));
@@ -482,6 +519,7 @@ public class AbstractSearchAsyncActionTests extends OpenSearchTestCase {
             },
             false,
             true,
+            false,
             new AtomicLong(),
             shards
         );
@@ -528,6 +566,7 @@ public class AbstractSearchAsyncActionTests extends OpenSearchTestCase {
             },
             false,
             false,
+            false,
             new AtomicLong(),
             shards
         );
@@ -543,7 +582,7 @@ public class AbstractSearchAsyncActionTests extends OpenSearchTestCase {
         assertThat(searchResponse.getSuccessfulShards(), equalTo(shards.length));
     }
 
-    public void testExecutePhaseOnShardFailure() throws InterruptedException {
+    private void innerTestExecutePhaseOnShardFailure(boolean catchExceptionWhenExecutePhaseOnShard) throws InterruptedException {
         final Index index = new Index("test", UUID.randomUUID().toString());
 
         final SearchShardIterator[] shards = IntStream.range(0, 2 + randomInt(3))
@@ -579,6 +618,7 @@ public class AbstractSearchAsyncActionTests extends OpenSearchTestCase {
             },
             false,
             false,
+            catchExceptionWhenExecutePhaseOnShard,
             new AtomicLong(),
             shards
         );
@@ -592,6 +632,14 @@ public class AbstractSearchAsyncActionTests extends OpenSearchTestCase {
         assertSame(searchResponse.getProfileResults(), internalSearchResponse.profile());
         assertSame(searchResponse.getHits(), internalSearchResponse.hits());
         assertThat(searchResponse.getSuccessfulShards(), equalTo(shards.length));
+    }
+
+    public void testExecutePhaseOnShardFailure() throws InterruptedException {
+        innerTestExecutePhaseOnShardFailure(false);
+    }
+
+    public void testExecutePhaseOnShardFailureAndThrowException() throws InterruptedException {
+        innerTestExecutePhaseOnShardFailure(true);
     }
 
     public void testOnPhaseListenersWithQueryAndThenFetchType() throws InterruptedException {
