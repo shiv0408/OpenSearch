@@ -26,10 +26,12 @@ public class ClusterStateIT extends AbstractRollingTestCase{
         }
     }
 
+    @SuppressWarnings("unchecked")
     private static void verifyTemplateMetadataInClusterState() throws Exception {
         Request request = new Request("GET", "_cluster/state/metadata");
         Response response = client().performRequest(request);
         assertOK(response);
-        assertNotNull(((Map<String, Object>) entityAsMap(response).get("metadata")).get("templates"));
+        Map<String, Object> metadata = (Map<String, Object>) entityAsMap(response).get("metadata");
+        assertNotNull(metadata.get("templates"));
     }
 }
