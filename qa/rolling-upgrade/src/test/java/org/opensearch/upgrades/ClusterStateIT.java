@@ -33,6 +33,6 @@ public class ClusterStateIT extends AbstractRollingTestCase{
         Request request = new Request("GET", "_cluster/state/metadata");
         Response response = client().performRequest(request);
         assertOK(response);
-        assertNotNull(entityAsMap(response).get("index_template"));
+        assertNotNull(entityAsMap(response).get("templates"));
     }
 }
