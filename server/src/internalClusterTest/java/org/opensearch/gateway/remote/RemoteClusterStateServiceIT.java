@@ -29,7 +29,9 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Base64;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import static org.opensearch.action.admin.cluster.node.stats.NodesStatsRequest.Metric.FS;
@@ -209,13 +211,23 @@ public class RemoteClusterStateServiceIT extends RemoteStoreBaseIntegTestCase {
                 .encodeToString(getClusterState().getClusterName().value().getBytes(StandardCharsets.UTF_8))
         ).add("cluster-state").add(getClusterState().metadata().clusterUUID()).add("global-metadata");
 
-        Set<String> metadataFiles = repository.blobStore().blobContainer(globalMetadataPath).listBlobs()
-            .keySet().stream().map(fileName -> fileName.split(DELIMITER)[0]).collect(Collectors.toSet());
-        assertTrue(metadataFiles.contains(COORDINATION_METADATA));
-        assertTrue(metadataFiles.contains(SETTING_METADATA));
-        assertTrue(metadataFiles.contains(TEMPLATES_METADATA));
-        assertTrue(metadataFiles.contains(CUSTOM_METADATA));
-        assertFalse(metadataFiles.contains(METADATA_FILE_PREFIX));
+        Map<String, Integer> metadataFiles = repository.blobStore().blobContainer(globalMetadataPath).listBlobs()
+            .keySet().stream()
+            .map(fileName -> {
+                logger.info(fileName);
+                return fileName.split(DELIMITER)[0];
+            })
+            .collect(Collectors.toMap(Function.identity(), key -> 1, Integer::sum));
+
+        assertTrue(metadataFiles.containsKey(COORDINATION_METADATA));
+        assertEquals(1, (int) metadataFiles.get(COORDINATION_METADATA));
+        assertTrue(metadataFiles.containsKey(SETTING_METADATA));
+        assertEquals(1, (int) metadataFiles.get(SETTING_METADATA));
+        assertTrue(metadataFiles.containsKey(TEMPLATES_METADATA));
+        assertEquals(1, (int) metadataFiles.get(TEMPLATES_METADATA));
+        assertTrue(metadataFiles.containsKey(CUSTOM_METADATA));
+        assertEquals(1, (int) metadataFiles.get(CUSTOM_METADATA));
+        assertFalse(metadataFiles.containsKey(METADATA_FILE_PREFIX));
     }
 
     private void validateNodesStatsResponse(NodesStatsResponse nodesStatsResponse) {
