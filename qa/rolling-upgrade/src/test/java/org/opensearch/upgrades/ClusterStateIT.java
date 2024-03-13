@@ -15,7 +15,7 @@ public class ClusterStateIT extends AbstractRollingTestCase{
     public void testTemplateMetadataUpgrades() throws Exception {
         if (CLUSTER_TYPE == ClusterType.OLD) {
             String templateName = "my_template";
-            Request putIndexTemplate = new Request("PUT", "_index_template/" + templateName);
+            Request putIndexTemplate = new Request("PUT", "_template/" + templateName);
             putIndexTemplate.setJsonEntity("{\"index_patterns\": [\"pattern-1\", \"log-*\"]}");
             client().performRequest(putIndexTemplate);
             verifyTemplateMetadataInClusterState();
