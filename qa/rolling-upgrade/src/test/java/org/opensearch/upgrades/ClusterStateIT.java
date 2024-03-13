@@ -11,6 +11,8 @@ package org.opensearch.upgrades;
 import org.opensearch.client.Request;
 import org.opensearch.client.Response;
 
+import java.util.Map;
+
 public class ClusterStateIT extends AbstractRollingTestCase{
     public void testTemplateMetadataUpgrades() throws Exception {
         if (CLUSTER_TYPE == ClusterType.OLD) {
@@ -28,6 +30,6 @@ public class ClusterStateIT extends AbstractRollingTestCase{
         Request request = new Request("GET", "_cluster/state/metadata");
         Response response = client().performRequest(request);
         assertOK(response);
-        assertNotNull("response: " + entityAsMap(response).toString(), entityAsMap(response).get("templates"));
+        assertNotNull(((Map<String, Object>) entityAsMap(response).get("metadata")).get("templates"));
     }
 }
