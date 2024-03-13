@@ -10,11 +10,6 @@ package org.opensearch.upgrades;
 
 import org.opensearch.client.Request;
 import org.opensearch.client.Response;
-import org.opensearch.cluster.metadata.Metadata;
-import org.opensearch.core.common.io.stream.StreamInput;
-
-import java.util.logging.LogManager;
-import java.util.logging.Logger;
 
 public class ClusterStateIT extends AbstractRollingTestCase{
     public void testTemplateMetadataUpgrades() throws Exception {
@@ -33,6 +28,6 @@ public class ClusterStateIT extends AbstractRollingTestCase{
         Request request = new Request("GET", "_cluster/state/metadata");
         Response response = client().performRequest(request);
         assertOK(response);
-        assertNotNull(entityAsMap(response).get("templates"));
+        assertNotNull("response: " + entityAsMap(response).toString(), entityAsMap(response).get("templates"));
     }
 }
