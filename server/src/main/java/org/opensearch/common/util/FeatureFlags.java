@@ -12,9 +12,11 @@ import org.opensearch.common.settings.Setting;
 import org.opensearch.common.settings.Setting.Property;
 import org.opensearch.common.settings.Settings;
 
+import java.util.List;
+
 /**
  * Utility class to manage feature flags. Feature flags are system properties that must be set on the JVM.
- * These are used to gate the visibility/availability of incomplete features. Fore more information, see
+ * These are used to gate the visibility/availability of incomplete features. For more information, see
  * https://featureflags.io/feature-flag-introduction/
  *
  * @opensearch.internal
@@ -47,6 +49,18 @@ public class FeatureFlags {
      * Gates the functionality of telemetry framework.
      */
     public static final String TELEMETRY = "opensearch.experimental.feature.telemetry.enabled";
+
+    /**
+     * Gates the functionality of remote routing table.
+     */
+    public static final String REMOTE_ROUTING_TABLE_EXPERIMENTAL = "opensearch.experimental.feature.remote_store.routing.enabled";
+
+
+    public static final Setting<Boolean> REMOTE_ROUTING_TABLE_EXPERIMENTAL_SETTING = Setting.boolSetting(
+        REMOTE_ROUTING_TABLE_EXPERIMENTAL,
+        true,
+        Property.NodeScope
+    );
 
     /**
      * Gates the optimization of datetime formatters caching along with change in default datetime formatter.

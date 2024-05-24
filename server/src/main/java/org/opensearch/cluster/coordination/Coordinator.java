@@ -85,6 +85,7 @@ import org.opensearch.discovery.HandshakingTransportAddressConnector;
 import org.opensearch.discovery.PeerFinder;
 import org.opensearch.discovery.SeedHostsProvider;
 import org.opensearch.discovery.SeedHostsResolver;
+import org.opensearch.gateway.remote.RemoteClusterStateService;
 import org.opensearch.monitor.NodeHealthService;
 import org.opensearch.monitor.StatusInfo;
 import org.opensearch.node.remotestore.RemoteStoreNodeService;
@@ -208,7 +209,8 @@ public class Coordinator extends AbstractLifecycleComponent implements Discovery
         ElectionStrategy electionStrategy,
         NodeHealthService nodeHealthService,
         PersistedStateRegistry persistedStateRegistry,
-        RemoteStoreNodeService remoteStoreNodeService
+        RemoteStoreNodeService remoteStoreNodeService,
+        RemoteClusterStateService remoteClusterStateService
     ) {
         this.settings = settings;
         this.transportService = transportService;
@@ -260,7 +262,8 @@ public class Coordinator extends AbstractLifecycleComponent implements Discovery
             transportService,
             namedWriteableRegistry,
             this::handlePublishRequest,
-            this::handleApplyCommit
+            this::handleApplyCommit,
+            remoteClusterStateService
         );
         this.leaderChecker = new LeaderChecker(settings, clusterSettings, transportService, this::onLeaderFailure, nodeHealthService);
         this.followersChecker = new FollowersChecker(
@@ -1321,7 +1324,7 @@ public class Coordinator extends AbstractLifecycleComponent implements Discovery
                     + clusterState;
 
                 final PublicationTransportHandler.PublicationContext publicationContext = publicationHandler.newPublicationContext(
-                    clusterChangedEvent
+                    clusterChangedEvent, coordinationState.get().isRemoteStateEnabled()
                 );
 
                 final PublishRequest publishRequest = coordinationState.get().handleClientValue(clusterState);
