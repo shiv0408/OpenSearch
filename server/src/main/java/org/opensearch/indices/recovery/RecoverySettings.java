@@ -48,6 +48,8 @@ import org.opensearch.core.common.unit.ByteSizeValue;
 
 import java.util.concurrent.TimeUnit;
 
+import static org.opensearch.indices.RemoteStoreSettings.CLUSTER_REMOTE_INDEX_SEGMENT_METADATA_RETENTION_MAX_COUNT_SETTING;
+
 /**
  * Settings for the recovery mechanism
  *
@@ -157,25 +159,6 @@ public class RecoverySettings {
         TimeValue.timeValueSeconds(0),
         Property.Dynamic,
         Property.NodeScope
-    );
-
-    /**
-     * Controls minimum number of metadata files to keep in remote segment store.
-     * {@code value < 1} will disable deletion of stale segment metadata files.
-     */
-    public static final Setting<Integer> CLUSTER_REMOTE_INDEX_SEGMENT_METADATA_RETENTION_MAX_COUNT_SETTING = Setting.intSetting(
-        "cluster.remote_store.index.segment_metadata.retention.max_count",
-        10,
-        -1,
-        v -> {
-            if (v == 0) {
-                throw new IllegalArgumentException(
-                    "Value 0 is not allowed for this setting as it would delete all the data from remote segment store"
-                );
-            }
-        },
-        Property.NodeScope,
-        Property.Dynamic
     );
 
     public static final Setting<TimeValue> INDICES_INTERNAL_REMOTE_UPLOAD_TIMEOUT = Setting.timeSetting(

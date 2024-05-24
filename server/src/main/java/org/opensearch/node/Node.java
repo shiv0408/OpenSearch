@@ -135,6 +135,7 @@ import org.opensearch.gateway.GatewayModule;
 import org.opensearch.gateway.GatewayService;
 import org.opensearch.gateway.MetaStateService;
 import org.opensearch.gateway.PersistedClusterStateService;
+import org.opensearch.gateway.remote.RemoteClusterStateCleanupManager;
 import org.opensearch.gateway.remote.RemoteClusterStateService;
 import org.opensearch.http.HttpServerTransport;
 import org.opensearch.identity.IdentityService;
@@ -145,6 +146,7 @@ import org.opensearch.index.SegmentReplicationStatsTracker;
 import org.opensearch.index.analysis.AnalysisRegistry;
 import org.opensearch.index.engine.EngineFactory;
 import org.opensearch.index.recovery.RemoteStoreRestoreService;
+import org.opensearch.index.remote.RemoteIndexPathUploader;
 import org.opensearch.index.remote.RemoteStoreStatsTrackerFactory;
 import org.opensearch.index.store.RemoteSegmentStoreDirectoryFactory;
 import org.opensearch.index.store.remote.filecache.FileCache;
@@ -152,6 +154,7 @@ import org.opensearch.index.store.remote.filecache.FileCacheCleaner;
 import org.opensearch.index.store.remote.filecache.FileCacheFactory;
 import org.opensearch.indices.IndicesModule;
 import org.opensearch.indices.IndicesService;
+import org.opensearch.indices.RemoteStoreSettings;
 import org.opensearch.indices.ShardLimitValidator;
 import org.opensearch.indices.SystemIndexDescriptor;
 import org.opensearch.indices.SystemIndices;
@@ -201,6 +204,7 @@ import org.opensearch.plugins.RepositoryPlugin;
 import org.opensearch.plugins.ScriptPlugin;
 import org.opensearch.plugins.SearchPipelinePlugin;
 import org.opensearch.plugins.SearchPlugin;
+import org.opensearch.plugins.SecureSettingsFactory;
 import org.opensearch.plugins.SecureTransportSettingsProvider;
 import org.opensearch.plugins.SystemIndexPlugin;
 import org.opensearch.plugins.TelemetryPlugin;
@@ -259,6 +263,7 @@ import java.io.IOException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
@@ -724,17 +729,28 @@ public class Node implements Closeable {
                 threadPool::relativeTimeInMillis
             );
             final RemoteClusterStateService remoteClusterStateService;
+            final RemoteClusterStateCleanupManager remoteClusterStateCleanupManager;
+            final RemoteIndexPathUploader remoteIndexPathUploader;
             if (isRemoteStoreClusterStateEnabled(settings)) {
+                remoteIndexPathUploader = new RemoteIndexPathUploader(
+                    threadPool,
+                    settings,
+                    repositoriesServiceReference::get,
+                    clusterService.getClusterSettings()
+                );
                 remoteClusterStateService = new RemoteClusterStateService(
                     nodeEnvironment.nodeId(),
                     repositoriesServiceReference::get,
                     settings,
-                    clusterService.getClusterSettings(),
+                    clusterService,
                     threadPool::preciseRelativeTimeInNanos,
                     threadPool
                 );
+                remoteClusterStateCleanupManager = remoteClusterStateService.getCleanupManager();
             } else {
                 remoteClusterStateService = null;
+                remoteIndexPathUploader = null;
+                remoteClusterStateCleanupManager = null;
             }
 
             // collect engine factory providers from plugins
@@ -786,6 +802,8 @@ public class Node implements Closeable {
             clusterService.setRerouteService(rerouteService);
 
             final RecoverySettings recoverySettings = new RecoverySettings(settings, settingsModule.getClusterSettings());
+
+            final RemoteStoreSettings remoteStoreSettings = new RemoteStoreSettings(settings, settingsModule.getClusterSettings());
 
             final IndexStorePlugin.DirectoryFactory remoteDirectoryFactory = new RemoteSegmentStoreDirectoryFactory(
                 repositoriesServiceReference::get,
@@ -1125,7 +1143,8 @@ public class Node implements Closeable {
                 rerouteService,
                 fsHealthService,
                 persistedStateRegistry,
-                remoteStoreNodeService
+                remoteStoreNodeService,
+                remoteClusterStateService
             );
             final SearchPipelineService searchPipelineService = new SearchPipelineService(
                 clusterService,
@@ -1303,6 +1322,8 @@ public class Node implements Closeable {
                 b.bind(SearchRequestSlowLog.class).toInstance(searchRequestSlowLog);
                 b.bind(MetricsRegistry.class).toInstance(metricsRegistry);
                 b.bind(RemoteClusterStateService.class).toProvider(() -> remoteClusterStateService);
+                b.bind(RemoteIndexPathUploader.class).toProvider(() -> remoteIndexPathUploader);
+                b.bind(RemoteClusterStateCleanupManager.class).toProvider(() -> remoteClusterStateCleanupManager);
                 b.bind(PersistedStateRegistry.class).toInstance(persistedStateRegistry);
                 b.bind(SegmentReplicationStatsTracker.class).toInstance(segmentReplicationStatsTracker);
                 b.bind(SearchRequestOperationsCompositeListenerFactory.class).toInstance(searchRequestOperationsCompositeListenerFactory);
@@ -1451,6 +1472,10 @@ public class Node implements Closeable {
         final RemoteClusterStateService remoteClusterStateService = injector.getInstance(RemoteClusterStateService.class);
         if (remoteClusterStateService != null) {
             remoteClusterStateService.start();
+        }
+        final RemoteIndexPathUploader remoteIndexPathUploader = injector.getInstance(RemoteIndexPathUploader.class);
+        if (remoteIndexPathUploader != null) {
+            remoteIndexPathUploader.start();
         }
         // Load (and maybe upgrade) the metadata stored on disk
         final GatewayMetaState gatewayMetaState = injector.getInstance(GatewayMetaState.class);

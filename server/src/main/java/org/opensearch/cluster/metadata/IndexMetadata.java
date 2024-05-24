@@ -158,6 +158,7 @@ public class IndexMetadata implements Diffable<IndexMetadata>, ToXContentFragmen
         EnumSet.of(ClusterBlockLevel.METADATA_WRITE, ClusterBlockLevel.WRITE)
     );
 
+    public static final String REMOTE_STORE_CUSTOM_KEY = "remote_store";
     /**
      * The state of the index.
      *
@@ -752,6 +753,10 @@ public class IndexMetadata implements Diffable<IndexMetadata>, ToXContentFragmen
 
     public String getIndexUUID() {
         return index.getUUID();
+    }
+
+    public String getIndexName() {
+        return index.getName();
     }
 
     /**

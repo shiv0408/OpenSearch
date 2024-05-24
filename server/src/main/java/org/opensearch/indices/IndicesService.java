@@ -202,6 +202,7 @@ import static org.opensearch.core.common.util.CollectionUtils.arrayAsArrayList;
 import static org.opensearch.index.IndexService.IndexCreationContext.CREATE_INDEX;
 import static org.opensearch.index.IndexService.IndexCreationContext.METADATA_VERIFICATION;
 import static org.opensearch.index.query.AbstractQueryBuilder.parseInnerQueryBuilder;
+import static org.opensearch.indices.RemoteStoreSettings.CLUSTER_REMOTE_TRANSLOG_BUFFER_INTERVAL_SETTING;
 import static org.opensearch.search.SearchService.ALLOW_EXPENSIVE_QUERIES;
 
 /**
@@ -246,17 +247,6 @@ public class IndicesService extends AbstractLifecycleComponent
         ReplicationType::parseString,
         Property.NodeScope,
         Property.Final
-    );
-
-    /**
-     * Used to specify the default translog buffer interval for remote store backed indexes.
-     */
-    public static final Setting<TimeValue> CLUSTER_REMOTE_TRANSLOG_BUFFER_INTERVAL_SETTING = Setting.timeSetting(
-        "cluster.remote_store.translog.buffer_interval",
-        IndexSettings.DEFAULT_REMOTE_TRANSLOG_BUFFER_INTERVAL,
-        IndexSettings.MINIMUM_REMOTE_TRANSLOG_BUFFER_INTERVAL,
-        Property.NodeScope,
-        Property.Dynamic
     );
 
     /**
