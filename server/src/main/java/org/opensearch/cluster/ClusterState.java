@@ -61,6 +61,7 @@ import org.opensearch.core.common.io.stream.StreamOutput;
 import org.opensearch.core.common.io.stream.VersionedNamedWriteable;
 import org.opensearch.core.xcontent.ToXContentFragment;
 import org.opensearch.core.xcontent.XContentBuilder;
+import org.opensearch.core.xcontent.XContentParser;
 import org.opensearch.discovery.Discovery;
 
 import java.io.IOException;
@@ -154,6 +155,9 @@ public class ClusterState implements ToXContentFragment, Diffable<ClusterState> 
             return false;
         }
 
+        static Custom fromXContent(XContentParser parser, String name) throws IOException {
+            return parser.namedObject(Custom.class, name, null);
+        }
     }
 
     private static final NamedDiffableValueSerializer<Custom> CUSTOM_VALUE_SERIALIZER = new NamedDiffableValueSerializer<>(Custom.class);

@@ -73,17 +73,10 @@ public class RemoteManifestManager {
 
     ClusterMetadataManifest uploadManifest(
         ClusterState clusterState,
-        List<ClusterMetadataManifest.UploadedIndexMetadata> uploadedIndexMetadata,
+        RemoteClusterStateUtils.UploadedMetadataResults uploadedMetadataResult,
         String previousClusterUUID,
-        ClusterMetadataManifest.UploadedMetadataAttribute uploadedCoordinationMetadata,
-        ClusterMetadataManifest.UploadedMetadataAttribute uploadedSettingsMetadata,
-        ClusterMetadataManifest.UploadedMetadataAttribute uploadedTransientSettingsMetadata,
-        ClusterMetadataManifest.UploadedMetadataAttribute uploadedTemplatesMetadata,
-        Map<String, ClusterMetadataManifest.UploadedMetadataAttribute> uploadedCustomMetadataMap,
-        ClusterMetadataManifest.UploadedMetadataAttribute uploadedDiscoveryNodesMetadata,
-        ClusterMetadataManifest.UploadedMetadataAttribute uploadedClusterBlocksMetadata,
         ClusterStateDiffManifest clusterDiffManifest,
-        List<ClusterMetadataManifest.UploadedIndexMetadata> routingIndexMetadata, boolean committed
+        boolean committed
     ) {
         synchronized (this) {
             ClusterMetadataManifest.Builder manifestBuilder = ClusterMetadataManifest.builder();
@@ -95,20 +88,20 @@ public class RemoteManifestManager {
                 .nodeId(nodeId)
                 .committed(committed)
                 .codecVersion(RemoteClusterMetadataManifest.MANIFEST_CURRENT_CODEC_VERSION)
-                .indices(uploadedIndexMetadata)
+                .indices(uploadedMetadataResult.uploadedIndexMetadata)
                 .previousClusterUUID(previousClusterUUID)
                 .clusterUUIDCommitted(clusterState.metadata().clusterUUIDCommitted())
-                .coordinationMetadata(uploadedCoordinationMetadata)
-                .settingMetadata(uploadedSettingsMetadata)
-                .templatesMetadata(uploadedTemplatesMetadata)
-                .customMetadataMap(uploadedCustomMetadataMap)
-                .discoveryNodesMetadata(uploadedDiscoveryNodesMetadata)
-                .clusterBlocksMetadata(uploadedClusterBlocksMetadata)
+                .coordinationMetadata(uploadedMetadataResult.uploadedCoordinationMetadata)
+                .settingMetadata(uploadedMetadataResult.uploadedSettingsMetadata)
+                .templatesMetadata(uploadedMetadataResult.uploadedTemplatesMetadata)
+                .customMetadataMap(uploadedMetadataResult.uploadedCustomMetadataMap)
+                .discoveryNodesMetadata(uploadedMetadataResult.uploadedDiscoveryNodes)
+                .clusterBlocksMetadata(uploadedMetadataResult.uploadedClusterBlocks)
                 .diffManifest(clusterDiffManifest)
                 .routingTableVersion(clusterState.getRoutingTable().version())
-                .indicesRouting(routingIndexMetadata)
+                .indicesRouting(uploadedMetadataResult.uploadedIndicesRoutingMetadata)
                 .metadataVersion(clusterState.metadata().version())
-                .transientSettingsMetadata(uploadedTransientSettingsMetadata);
+                .transientSettingsMetadata(uploadedMetadataResult.uploadedTransientSettingsMetadata);
             final ClusterMetadataManifest manifest = manifestBuilder.build();
             writeMetadataManifest(clusterState.getClusterName().value(), clusterState.metadata().clusterUUID(), manifest);
             return manifest;

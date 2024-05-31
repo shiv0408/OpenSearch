@@ -11,6 +11,7 @@ package org.opensearch.gateway.remote;
 import org.opensearch.action.LatchedActionListener;
 import org.opensearch.cluster.ClusterState;
 import org.opensearch.cluster.block.ClusterBlocks;
+import org.opensearch.cluster.metadata.DiffableStringMap;
 import org.opensearch.cluster.node.DiscoveryNodes;
 import org.opensearch.common.CheckedRunnable;
 import org.opensearch.core.action.ActionListener;
@@ -19,14 +20,25 @@ import org.opensearch.gateway.remote.RemoteClusterStateUtils.RemoteStateTransfer
 import org.opensearch.gateway.remote.model.AbstractRemoteBlobObject;
 import org.opensearch.gateway.remote.model.RemoteClusterBlocks;
 import org.opensearch.gateway.remote.model.RemoteClusterBlocksBlobStore;
+import org.opensearch.gateway.remote.model.RemoteClusterStateCustoms;
+import org.opensearch.gateway.remote.model.RemoteClusterStateCustomsBlobStore;
 import org.opensearch.gateway.remote.model.RemoteDiscoveryNodes;
 import org.opensearch.gateway.remote.model.RemoteDiscoveryNodesBlobStore;
+import org.opensearch.gateway.remote.model.RemoteHashesOfConsistentSettings;
+import org.opensearch.gateway.remote.model.RemoteHashesOfConsistentSettingsBlobStore;
 import org.opensearch.gateway.remote.model.RemoteReadResult;
 import org.opensearch.index.translog.transfer.BlobStoreTransferService;
 import org.opensearch.repositories.blobstore.BlobStoreRepository;
 import org.opensearch.threadpool.ThreadPool;
 
 import java.io.IOException;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
+
+import static org.opensearch.gateway.remote.model.RemoteClusterStateCustoms.CLUSTER_STATE_CUSTOM;
+import static org.opensearch.gateway.remote.model.RemoteHashesOfConsistentSettings.HASHES_OF_CONSISTENT_SETTINGS;
 
 public class RemoteClusterStateAttributesManager {
     public static final String CLUSTER_STATE_ATTRIBUTE = "cluster_state_attribute";
@@ -39,6 +51,7 @@ public class RemoteClusterStateAttributesManager {
     private final String clusterName;
     private final RemoteClusterBlocksBlobStore clusterBlocksBlobStore;
     private final RemoteDiscoveryNodesBlobStore discoveryNodesBlobStore;
+    private final RemoteClusterStateCustomsBlobStore customsBlobStore;
 
     RemoteClusterStateAttributesManager(BlobStoreTransferService blobStoreTransferService, BlobStoreRepository repository, ThreadPool threadPool, String clusterName) {
         this.blobStoreTransferService = blobStoreTransferService;
@@ -47,6 +60,7 @@ public class RemoteClusterStateAttributesManager {
         this.clusterName = clusterName;
         this.clusterBlocksBlobStore = new RemoteClusterBlocksBlobStore(blobStoreTransferService, blobStoreRepository, clusterName, threadPool);
         this.discoveryNodesBlobStore = new RemoteDiscoveryNodesBlobStore(blobStoreTransferService, blobStoreRepository, clusterName, threadPool);
+        this.customsBlobStore = new RemoteClusterStateCustomsBlobStore(blobStoreTransferService, blobStoreRepository, clusterName, threadPool);
     }
 
     /**
@@ -64,6 +78,15 @@ public class RemoteClusterStateAttributesManager {
         } else if (componentData instanceof ClusterBlocks) {
             RemoteClusterBlocks remoteObject = new RemoteClusterBlocks((ClusterBlocks) componentData, clusterState.version(), clusterState.metadata().clusterUUID(), blobStoreRepository);
             return () -> clusterBlocksBlobStore.writeAsync(remoteObject, getActionListener(component, remoteObject, latchedActionListener));
+        } else if (componentData instanceof ClusterState.Custom) {
+            RemoteClusterStateCustoms remoteObject = new RemoteClusterStateCustoms(
+                (ClusterState.Custom) componentData,
+                component,
+                clusterState.version(),
+                clusterState.metadata().clusterUUID(),
+                blobStoreRepository
+            );
+            return () -> customsBlobStore.writeAsync(remoteObject, getActionListener(component, remoteObject, latchedActionListener));
         } else {
             throw new RemoteStateTransferException("Remote object not found for "+ componentData.getClass());
         }
@@ -81,6 +104,7 @@ public class RemoteClusterStateAttributesManager {
     public CheckedRunnable<IOException> getAsyncMetadataReadAction(
         String clusterUUID,
         String component,
+        String componentName,
         String uploadedFilename,
         LatchedActionListener<RemoteReadResult> listener
     ) {
@@ -91,8 +115,26 @@ public class RemoteClusterStateAttributesManager {
         } else if (component.equals(RemoteClusterBlocks.CLUSTER_BLOCKS)) {
             RemoteClusterBlocks remoteClusterBlocks = new RemoteClusterBlocks(uploadedFilename, clusterUUID, blobStoreRepository);
             return () -> clusterBlocksBlobStore.readAsync(remoteClusterBlocks, actionListener);
-        }  else {
+        } else if (component.equals(CLUSTER_STATE_CUSTOM)) {
+            RemoteClusterStateCustoms remoteClusterStateCustoms = new RemoteClusterStateCustoms(uploadedFilename, componentName, clusterUUID, blobStoreRepository);
+            return () -> customsBlobStore.readAsync(remoteClusterStateCustoms, actionListener);
+        } else {
             throw new RemoteStateTransferException("Remote object not found for "+ component);
         }
+    }
+
+    public Map<String, ClusterState.Custom> getUpdatedCustoms(ClusterState clusterState, ClusterState previousClusterState) {
+        Map<String, ClusterState.Custom> updatedCustoms = new HashMap<>();
+        Set<String> currentCustoms = new HashSet<>(clusterState.customs().keySet());
+        for (Map.Entry<String, ClusterState.Custom> entry : previousClusterState.customs().entrySet()) {
+            if (currentCustoms.contains(entry.getKey()) && !entry.getValue().equals(clusterState.customs().get(entry.getKey()))) {
+                updatedCustoms.put(entry.getKey(), clusterState.customs().get(entry.getKey()));
+            }
+            currentCustoms.remove(entry.getKey());
+        }
+        for (String custom : currentCustoms) {
+            updatedCustoms.put(custom, clusterState.customs().get(custom));
+        }
+        return updatedCustoms;
     }
 }

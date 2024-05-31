@@ -9,6 +9,7 @@
 package org.opensearch.gateway.remote.model;
 
 import static org.opensearch.gateway.remote.RemoteClusterStateAttributesManager.CLUSTER_STATE_ATTRIBUTES_CURRENT_CODEC_VERSION;
+import static org.opensearch.gateway.remote.RemoteClusterStateUtils.CLUSTER_STATE_EPHEMERAL_PATH_TOKEN;
 import static org.opensearch.gateway.remote.RemoteClusterStateUtils.DELIMITER;
 import static org.opensearch.gateway.remote.RemoteClusterStateUtils.METADATA_NAME_FORMAT;
 
@@ -52,12 +53,12 @@ public class RemoteDiscoveryNodes extends AbstractRemoteBlobObject<DiscoveryNode
 
     @Override
     public BlobPathParameters getBlobPathParameters() {
-        return new BlobPathParameters(List.of("transient"), DISCOVERY_NODES);
+        return new BlobPathParameters(List.of(CLUSTER_STATE_EPHEMERAL_PATH_TOKEN), DISCOVERY_NODES);
     }
 
     @Override
     public String generateBlobFileName() {
-        // 123456789012_test-cluster/cluster-state/dsgYj10Nkso7/transient/<componentPrefix>__<inverted_state_version>__<inverted__timestamp>__<codec_version>
+        // 123456789012_test-cluster/cluster-state/dsgYj10Nkso7/ephemeral/<componentPrefix>__<inverted_state_version>__<inverted__timestamp>__<codec_version>
         String blobFileName = String.join(
             DELIMITER,
             getBlobPathParameters().getFilePrefix(),

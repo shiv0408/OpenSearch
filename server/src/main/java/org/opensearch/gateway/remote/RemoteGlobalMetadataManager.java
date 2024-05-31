@@ -9,9 +9,11 @@
 package org.opensearch.gateway.remote;
 
 import static java.util.Objects.requireNonNull;
+import static org.opensearch.gateway.remote.RemoteClusterStateUtils.GLOBAL_METADATA_PATH_TOKEN;
 import static org.opensearch.gateway.remote.RemoteClusterStateUtils.METADATA_NAME_FORMAT;
 import static org.opensearch.gateway.remote.RemoteClusterStateUtils.RemoteStateTransferException;
 import static org.opensearch.gateway.remote.RemoteClusterStateUtils.getCusterMetadataBasePath;
+import static org.opensearch.gateway.remote.model.RemoteHashesOfConsistentSettings.HASHES_OF_CONSISTENT_SETTINGS;
 import static org.opensearch.gateway.remote.model.RemoteTransientSettingsMetadata.TRANSIENT_SETTING_METADATA;
 
 import java.io.IOException;
@@ -23,6 +25,7 @@ import java.util.Set;
 import org.opensearch.action.LatchedActionListener;
 import org.opensearch.cluster.ClusterState;
 import org.opensearch.cluster.coordination.CoordinationMetadata;
+import org.opensearch.cluster.metadata.DiffableStringMap;
 import org.opensearch.cluster.metadata.Metadata;
 import org.opensearch.cluster.metadata.Metadata.Custom;
 import org.opensearch.cluster.metadata.TemplatesMetadata;
@@ -39,6 +42,8 @@ import org.opensearch.gateway.remote.model.RemoteCoordinationMetadata;
 import org.opensearch.gateway.remote.model.RemoteCoordinationMetadataBlobStore;
 import org.opensearch.gateway.remote.model.RemoteCustomMetadata;
 import org.opensearch.gateway.remote.model.RemoteCustomMetadataBlobStore;
+import org.opensearch.gateway.remote.model.RemoteHashesOfConsistentSettings;
+import org.opensearch.gateway.remote.model.RemoteHashesOfConsistentSettingsBlobStore;
 import org.opensearch.gateway.remote.model.RemotePersistentSettingsBlobStore;
 import org.opensearch.gateway.remote.model.RemotePersistentSettingsMetadata;
 import org.opensearch.gateway.remote.model.RemoteReadResult;
@@ -53,7 +58,6 @@ import org.opensearch.threadpool.ThreadPool;
 
 public class RemoteGlobalMetadataManager {
 
-    public static final String GLOBAL_METADATA_PATH_TOKEN = "global-metadata";
     public static final String COORDINATION_METADATA = "coordination";
     public static final String SETTING_METADATA = "settings";
     public static final String TEMPLATES_METADATA = "templates";
@@ -106,6 +110,7 @@ public class RemoteGlobalMetadataManager {
     private final RemotePersistentSettingsBlobStore persistentSettingsBlobStore;
     private final RemoteTemplatesMetadataBlobStore templatesMetadataBlobStore;
     private final RemoteCustomMetadataBlobStore customMetadataBlobStore;
+    private final RemoteHashesOfConsistentSettingsBlobStore hashesOfConsistentSettingsBlobStore;
 
     RemoteGlobalMetadataManager(BlobStoreRepository blobStoreRepository, ClusterSettings clusterSettings, ThreadPool threadPool, BlobStoreTransferService blobStoreTransferService,
         String clusterName) {
@@ -119,6 +124,7 @@ public class RemoteGlobalMetadataManager {
         this.persistentSettingsBlobStore = new RemotePersistentSettingsBlobStore(blobStoreTransferService, blobStoreRepository, clusterName, threadPool);
         this.templatesMetadataBlobStore = new RemoteTemplatesMetadataBlobStore(blobStoreTransferService, blobStoreRepository, clusterName, threadPool);
         this.customMetadataBlobStore = new RemoteCustomMetadataBlobStore(blobStoreTransferService, blobStoreRepository, clusterName, threadPool);
+        this.hashesOfConsistentSettingsBlobStore = new RemoteHashesOfConsistentSettingsBlobStore(blobStoreTransferService, blobStoreRepository, clusterName, threadPool);
         clusterSettings.addSettingsUpdateConsumer(GLOBAL_METADATA_UPLOAD_TIMEOUT_SETTING, this::setGlobalMetadataUploadTimeout);
     }
 
@@ -149,6 +155,14 @@ public class RemoteGlobalMetadataManager {
             RemoteTemplatesMetadata remoteTemplatesMetadata = new RemoteTemplatesMetadata((TemplatesMetadata) objectToUpload, metadataVersion, clusterUUID,
                 blobStoreRepository);
             return () -> templatesMetadataBlobStore.writeAsync(remoteTemplatesMetadata, getActionListener(remoteTemplatesMetadata, latchedActionListener));
+        } else if (objectToUpload instanceof DiffableStringMap) {
+            RemoteHashesOfConsistentSettings remoteObject = new RemoteHashesOfConsistentSettings(
+                (DiffableStringMap) objectToUpload,
+                metadataVersion,
+                clusterUUID,
+                blobStoreRepository
+            );
+            return () -> hashesOfConsistentSettingsBlobStore.writeAsync(remoteObject, getActionListener(remoteObject, latchedActionListener));
         } else if (objectToUpload instanceof Custom) {
             RemoteCustomMetadata remoteCustomMetadata = new RemoteCustomMetadata((Custom) objectToUpload, customType ,metadataVersion, clusterUUID,
                 blobStoreRepository);
@@ -189,6 +203,9 @@ public class RemoteGlobalMetadataManager {
         } else if (component.equals(CUSTOM_METADATA)) {
             RemoteCustomMetadata remoteBlobStoreObject = new RemoteCustomMetadata(uploadFilename, componentName, clusterUUID, blobStoreRepository);
             return () -> customMetadataBlobStore.readAsync(remoteBlobStoreObject, actionListener);
+        } else if (component.equals(HASHES_OF_CONSISTENT_SETTINGS)) {
+            RemoteHashesOfConsistentSettings remoteHashesOfConsistentSettings = new RemoteHashesOfConsistentSettings(uploadFilename, clusterUUID, blobStoreRepository);
+            return () -> hashesOfConsistentSettingsBlobStore.readAsync(remoteHashesOfConsistentSettings, actionListener);
         } else {
             throw new RemoteStateTransferException("Unknown component " + componentName);
         }

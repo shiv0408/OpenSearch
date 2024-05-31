@@ -318,6 +318,35 @@ public class ClusterModule extends AbstractModule {
                 DecommissionAttributeMetadata::fromXContent
             )
         );
+        // Cluster State
+        entries.add(
+            new NamedXContentRegistry.Entry(
+                ClusterState.Custom.class,
+                new ParseField(SnapshotsInProgress.TYPE),
+                SnapshotsInProgress::fromXContent
+            )
+        );
+        entries.add(
+            new NamedXContentRegistry.Entry(
+                ClusterState.Custom.class,
+                new ParseField(RestoreInProgress.TYPE),
+                RestoreInProgress::fromXContent
+            )
+        );
+        entries.add(
+            new NamedXContentRegistry.Entry(
+                ClusterState.Custom.class,
+                new ParseField(SnapshotDeletionsInProgress.TYPE),
+                SnapshotDeletionsInProgress::fromXContent
+            )
+        );
+        entries.add(
+            new NamedXContentRegistry.Entry(
+                ClusterState.Custom.class,
+                new ParseField(RepositoryCleanupInProgress.TYPE),
+                RepositoryCleanupInProgress::fromXContent
+            )
+        );
         return entries;
     }
 

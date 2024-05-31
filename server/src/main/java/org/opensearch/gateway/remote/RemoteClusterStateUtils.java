@@ -27,6 +27,8 @@ public class RemoteClusterStateUtils {
     public static final String METADATA_NAME_PLAIN_FORMAT = "%s";
     public static final String METADATA_FILE_PREFIX = "metadata";
     public static final String CLUSTER_STATE_PATH_TOKEN = "cluster-state";
+    public static final String GLOBAL_METADATA_PATH_TOKEN = "global-metadata";
+    public static final String CLUSTER_STATE_EPHEMERAL_PATH_TOKEN = "ephemeral";
     public static final String DELIMITER = "__";
     public static final String PATH_DELIMITER = "/";
 
@@ -75,6 +77,7 @@ public class RemoteClusterStateUtils {
     public static class UploadedMetadataResults {
         List<ClusterMetadataManifest.UploadedIndexMetadata> uploadedIndexMetadata;
         Map<String, ClusterMetadataManifest.UploadedMetadataAttribute> uploadedCustomMetadataMap;
+        Map<String, ClusterMetadataManifest.UploadedMetadataAttribute> uploadedClusterStateCustomMetadataMap;
         ClusterMetadataManifest.UploadedMetadataAttribute uploadedCoordinationMetadata;
         ClusterMetadataManifest.UploadedMetadataAttribute uploadedSettingsMetadata;
         ClusterMetadataManifest.UploadedMetadataAttribute uploadedTransientSettingsMetadata;
@@ -82,6 +85,7 @@ public class RemoteClusterStateUtils {
         ClusterMetadataManifest.UploadedMetadataAttribute uploadedDiscoveryNodes;
         ClusterMetadataManifest.UploadedMetadataAttribute uploadedClusterBlocks;
         List<ClusterMetadataManifest.UploadedIndexMetadata> uploadedIndicesRoutingMetadata;
+        ClusterMetadataManifest.UploadedMetadataAttribute uploadedHashesOfConsistentSettings;
 
         public UploadedMetadataResults(
             List<ClusterMetadataManifest.UploadedIndexMetadata> uploadedIndexMetadata,
@@ -92,7 +96,9 @@ public class RemoteClusterStateUtils {
             ClusterMetadataManifest.UploadedMetadataAttribute uploadedTemplatesMetadata,
             ClusterMetadataManifest.UploadedMetadataAttribute uploadedDiscoveryNodes,
             ClusterMetadataManifest.UploadedMetadataAttribute uploadedClusterBlocks,
-            List<ClusterMetadataManifest.UploadedIndexMetadata> uploadedIndicesRoutingMetadata
+            List<ClusterMetadataManifest.UploadedIndexMetadata> uploadedIndicesRoutingMetadata,
+            ClusterMetadataManifest.UploadedMetadataAttribute uploadedHashesOfConsistentSettings,
+            Map<String, ClusterMetadataManifest.UploadedMetadataAttribute> uploadedClusterStateCustomMap
         ) {
             this.uploadedIndexMetadata = uploadedIndexMetadata;
             this.uploadedCustomMetadataMap = uploadedCustomMetadataMap;
@@ -103,6 +109,8 @@ public class RemoteClusterStateUtils {
             this.uploadedDiscoveryNodes = uploadedDiscoveryNodes;
             this.uploadedClusterBlocks = uploadedClusterBlocks;
             this.uploadedIndicesRoutingMetadata = uploadedIndicesRoutingMetadata;
+            this.uploadedHashesOfConsistentSettings = uploadedHashesOfConsistentSettings;
+            this.uploadedClusterStateCustomMetadataMap = uploadedClusterStateCustomMap;
         }
 
         public UploadedMetadataResults() {
@@ -115,6 +123,8 @@ public class RemoteClusterStateUtils {
             this.uploadedDiscoveryNodes = null;
             this.uploadedClusterBlocks = null;
             this.uploadedIndicesRoutingMetadata = new ArrayList<>();
+            this.uploadedHashesOfConsistentSettings = null;
+            this.uploadedClusterStateCustomMetadataMap = new HashMap<>();
         }
     }
 }

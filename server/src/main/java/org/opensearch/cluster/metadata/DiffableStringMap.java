@@ -74,7 +74,7 @@ public class DiffableStringMap extends AbstractMap<String, String> implements Di
         return map.isEmpty() ? EMPTY : new DiffableStringMap(map);
     }
 
-    DiffableStringMap(final Map<String, String> map) {
+    public DiffableStringMap(final Map<String, String> map) {
         this.innerMap = Collections.unmodifiableMap(map);
     }
 
@@ -100,7 +100,7 @@ public class DiffableStringMap extends AbstractMap<String, String> implements Di
 
     @Override
     public XContentBuilder toXContent(XContentBuilder builder, Params params) throws IOException {
-        builder.startObject();
+        builder.startObject("diffable_string_map");
         builder.field("inner_map", innerMap);
         builder.endObject();
         return builder;
@@ -110,9 +110,9 @@ public class DiffableStringMap extends AbstractMap<String, String> implements Di
         if (parser.currentToken() == null) { // fresh parser? move to next token
             parser.nextToken();
         }
-        if (parser.currentToken() == XContentParser.Token.START_OBJECT) {
-            parser.nextToken();
-        }
+        ensureFieldName(parser, parser.currentToken(), "diffable_string_map");
+        ensureExpectedToken(XContentParser.Token.START_OBJECT, parser.currentToken(), parser);
+        parser.nextToken();
         ensureFieldName(parser, parser.currentToken(), "inner_map");
         parser.nextToken();
         Map<String, Object> innerMap = parser.mapOrdered();

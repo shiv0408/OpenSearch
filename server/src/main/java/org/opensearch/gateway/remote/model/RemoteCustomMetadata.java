@@ -9,6 +9,7 @@
 package org.opensearch.gateway.remote.model;
 
 import static org.opensearch.gateway.remote.RemoteClusterStateUtils.DELIMITER;
+import static org.opensearch.gateway.remote.RemoteClusterStateUtils.GLOBAL_METADATA_PATH_TOKEN;
 import static org.opensearch.gateway.remote.RemoteClusterStateUtils.METADATA_NAME_FORMAT;
 import static org.opensearch.gateway.remote.RemoteGlobalMetadataManager.GLOBAL_METADATA_CURRENT_CODEC_VERSION;
 
@@ -72,7 +73,7 @@ public class RemoteCustomMetadata extends AbstractRemoteBlobObject<Custom> {
     @Override
     public BlobPathParameters getBlobPathParameters() {
         String prefix = String.join(CUSTOM_DELIMITER, CUSTOM_METADATA, customType);
-        return new BlobPathParameters(List.of("global-metadata"), prefix);
+        return new BlobPathParameters(List.of(GLOBAL_METADATA_PATH_TOKEN), prefix);
     }
 
     @Override

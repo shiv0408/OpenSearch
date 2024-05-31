@@ -65,6 +65,8 @@ public class ClusterMetadataManifest implements Writeable, ToXContentFragment {
     private static final ParseField UPLOADED_CUSTOM_METADATA = new ParseField("uploaded_custom_metadata");
     private static final ParseField UPLOADED_DISCOVERY_NODES_METADATA = new ParseField("uploaded_discovery_nodes_metadata");
     private static final ParseField UPLOADED_CLUSTER_BLOCKS_METADATA = new ParseField("uploaded_cluster_blocks_metadata");
+    private static final ParseField UPLOADED_HASHES_OF_CONSISTENT_SETTINGS_METADATA = new ParseField("uploaded_hashes_of_consistent_settings_metadata");
+    private static final ParseField UPLOADED_CLUSTER_STATE_CUSTOM_METADATA = new ParseField("uploaded_cluster_state_custom_metadata");
     private static final ParseField DIFF_MANIFEST = new ParseField("diff_manifest");
     private static final ParseField ROUTING_TABLE_VERSION_FIELD = new ParseField("routing_table_version");
     private static final ParseField INDICES_ROUTING_FIELD = new ParseField("indices_routing");
@@ -104,7 +106,9 @@ public class ClusterMetadataManifest implements Writeable, ToXContentFragment {
             .routingTableVersion(routingTableVersion(fields))
             .indicesRouting(indicesRouting(fields))
             .metadataVersion(metadataVersion(fields))
-            .transientSettingsMetadata(transientSettingsMetadata(fields));
+            .transientSettingsMetadata(transientSettingsMetadata(fields))
+            .hashesOfConsistentSettings(hashesOfConsistentSettings(fields))
+            .clusterStateCustomMetadataMap(clusterStateCustomMetadata(fields));
     }
 
     private static long term(Object[] fields) {
@@ -198,6 +202,15 @@ public class ClusterMetadataManifest implements Writeable, ToXContentFragment {
 
     private static UploadedMetadataAttribute transientSettingsMetadata(Object[] fields) {
         return (UploadedMetadataAttribute) fields[21];
+    }
+
+    private static UploadedMetadataAttribute hashesOfConsistentSettings(Object[] fields) {
+        return (UploadedMetadataAttribute) fields[22];
+    }
+
+    private static Map<String, UploadedMetadataAttribute> clusterStateCustomMetadata(Object[] fields) {
+        List<UploadedMetadataAttribute> customs = (List<UploadedMetadataAttribute>) fields[23];
+        return customs.stream().collect(Collectors.toMap(UploadedMetadataAttribute::getAttributeName, Function.identity()));
     }
 
     private static final ConstructingObjectParser<ClusterMetadataManifest, Void> PARSER_V0 = new ConstructingObjectParser<>(
@@ -299,6 +312,16 @@ public class ClusterMetadataManifest implements Writeable, ToXContentFragment {
                 UploadedMetadataAttribute.PARSER,
                 UPLOADED_TRANSIENT_SETTINGS_METADATA
             );
+            parser.declareNamedObject(
+                ConstructingObjectParser.optionalConstructorArg(),
+                UploadedMetadataAttribute.PARSER,
+                UPLOADED_HASHES_OF_CONSISTENT_SETTINGS_METADATA
+            );
+            parser.declareNamedObjects(
+                ConstructingObjectParser.optionalConstructorArg(),
+                UploadedMetadataAttribute.PARSER,
+                UPLOADED_CLUSTER_STATE_CUSTOM_METADATA
+            );
         }
     }
 
@@ -325,6 +348,8 @@ public class ClusterMetadataManifest implements Writeable, ToXContentFragment {
     private final ClusterStateDiffManifest diffManifest;
     private final long routingTableVersion;
     private final List<UploadedIndexMetadata> indicesRouting;
+    private final UploadedMetadataAttribute uploadedHashesOfConsistentSettings;
+    private final Map<String, UploadedMetadataAttribute> uploadedClusterStateCustomMap;
 
     public List<UploadedIndexMetadata> getIndices() {
         return indices;
@@ -412,13 +437,26 @@ public class ClusterMetadataManifest implements Writeable, ToXContentFragment {
         return uploadedCustomMetadataMap;
     }
 
-        public long getRoutingTableVersion() {
-            return routingTableVersion;
-        }
+    public UploadedMetadataAttribute getDiscoverNodeMetadata() {
+        return uploadedDiscoveryNodesMetadata;
+    }
 
-        public List<UploadedIndexMetadata> getIndicesRouting() {
-            return indicesRouting;
-        }
+    public Map<String, UploadedMetadataAttribute> getClusterStateCustomMap() {
+        return uploadedClusterStateCustomMap;
+    }
+
+    public UploadedMetadataAttribute getHashesOfConsistentSettings() {
+        return uploadedHashesOfConsistentSettings;
+    }
+
+    public long getRoutingTableVersion() {
+        return routingTableVersion;
+    }
+
+    public List<UploadedIndexMetadata> getIndicesRouting() {
+        return indicesRouting;
+    }
+
     public boolean hasMetadataAttributesFiles() {
         return uploadedCoordinationMetadata != null
             || uploadedSettingsMetadata != null
@@ -449,7 +487,9 @@ public class ClusterMetadataManifest implements Writeable, ToXContentFragment {
         long routingTableVersion,
         List<UploadedIndexMetadata> indicesRouting,
         long metadataVersion,
-        UploadedMetadataAttribute uploadedTransientSettingsMetadata
+        UploadedMetadataAttribute uploadedTransientSettingsMetadata,
+        UploadedMetadataAttribute uploadedHashesOfConsistentSettings,
+        Map<String, UploadedMetadataAttribute> uploadedClusterStateCustomMap
     ) {
         this.clusterTerm = clusterTerm;
         this.stateVersion = version;
@@ -476,6 +516,10 @@ public class ClusterMetadataManifest implements Writeable, ToXContentFragment {
         this.indicesRouting = Collections.unmodifiableList(indicesRouting);
         this.metadataVersion = metadataVersion;
         this.uploadedTransientSettingsMetadata = uploadedTransientSettingsMetadata;
+        this.uploadedHashesOfConsistentSettings = uploadedHashesOfConsistentSettings;
+        this.uploadedClusterStateCustomMap = Collections.unmodifiableMap(
+            uploadedClusterStateCustomMap != null ? uploadedClusterStateCustomMap : new HashMap<>()
+        );
     }
 
     public ClusterMetadataManifest(StreamInput in) throws IOException {
@@ -507,6 +551,10 @@ public class ClusterMetadataManifest implements Writeable, ToXContentFragment {
             this.indicesRouting = Collections.unmodifiableList(in.readList(UploadedIndexMetadata::new));
             this.metadataVersion = in.readLong();
             this.uploadedTransientSettingsMetadata = new UploadedMetadataAttribute(in);
+            this.uploadedHashesOfConsistentSettings = new UploadedMetadataAttribute(in);
+            this.uploadedClusterStateCustomMap = Collections.unmodifiableMap(
+                in.readMap(StreamInput::readString, UploadedMetadataAttribute::new)
+            );
         } else if (in.getVersion().onOrAfter(Version.V_2_12_0)) {
             this.codecVersion = in.readInt();
             this.globalMetadataFileName = in.readString();
@@ -521,6 +569,8 @@ public class ClusterMetadataManifest implements Writeable, ToXContentFragment {
             this.diffManifest = null;
             this.metadataVersion = -1;
             this.uploadedTransientSettingsMetadata = null;
+            this.uploadedHashesOfConsistentSettings = null;
+            this.uploadedClusterStateCustomMap = null;
         } else {
             this.codecVersion = CODEC_V0; // Default codec
             this.globalMetadataFileName = null;
@@ -535,6 +585,8 @@ public class ClusterMetadataManifest implements Writeable, ToXContentFragment {
             this.diffManifest = null;
             this.metadataVersion = -1;
             this.uploadedTransientSettingsMetadata = null;
+            this.uploadedHashesOfConsistentSettings = null;
+            this.uploadedClusterStateCustomMap = null;
         }
     }
 
@@ -625,6 +677,16 @@ public class ClusterMetadataManifest implements Writeable, ToXContentFragment {
                 }
             }
             builder.endArray();
+            builder.startObject(UPLOADED_CLUSTER_STATE_CUSTOM_METADATA.getPreferredName());
+            for (UploadedMetadataAttribute attribute : getClusterStateCustomMap().values()) {
+                attribute.toXContent(builder, params);
+            }
+            builder.endObject();
+            if (getHashesOfConsistentSettings() != null) {
+                builder.startObject(UPLOADED_HASHES_OF_CONSISTENT_SETTINGS_METADATA.getPreferredName());
+                getHashesOfConsistentSettings().toXContent(builder, params);
+                builder.endObject();
+            }
         }
         return builder;
     }
@@ -651,6 +713,8 @@ public class ClusterMetadataManifest implements Writeable, ToXContentFragment {
             out.writeCollection(indicesRouting);
             out.writeLong(metadataVersion);
             uploadedTransientSettingsMetadata.writeTo(out);
+            uploadedHashesOfConsistentSettings.writeTo(out);
+            out.writeMap(uploadedClusterStateCustomMap, StreamOutput::writeString, (o, v) -> v.writeTo(o));
         } else if (out.getVersion().onOrAfter(Version.V_2_12_0)) {
             out.writeInt(codecVersion);
             out.writeString(globalMetadataFileName);
@@ -659,6 +723,7 @@ public class ClusterMetadataManifest implements Writeable, ToXContentFragment {
 
     @Override
     public boolean equals(Object o) {
+        // ToDo: update this method to contain new attributes
         if (this == o) {
             return true;
         }
@@ -684,6 +749,7 @@ public class ClusterMetadataManifest implements Writeable, ToXContentFragment {
 
     @Override
     public int hashCode() {
+        // ToDo: update this method to contain new attributes
         return Objects.hash(
             codecVersion,
             globalMetadataFileName,
@@ -753,6 +819,8 @@ public class ClusterMetadataManifest implements Writeable, ToXContentFragment {
         private ClusterStateDiffManifest diffManifest;
         private long routingTableVersion;
         private List<UploadedIndexMetadata> indicesRouting;
+        private UploadedMetadataAttribute hashesOfConsistentSettings;
+        private Map<String, UploadedMetadataAttribute> clusterStateCustomMetadataMap;
 
         public Builder indices(List<UploadedIndexMetadata> indices) {
             this.indices = indices;
@@ -882,10 +950,21 @@ public class ClusterMetadataManifest implements Writeable, ToXContentFragment {
             return this;
         }
 
+        public Builder hashesOfConsistentSettings(UploadedMetadataAttribute hashesOfConsistentSettings) {
+            this.hashesOfConsistentSettings = hashesOfConsistentSettings;
+            return this;
+        }
+
+        public Builder clusterStateCustomMetadataMap(Map<String, UploadedMetadataAttribute> clusterStateCustomMetadataMap) {
+            this.clusterStateCustomMetadataMap = clusterStateCustomMetadataMap;
+            return this;
+        }
+
         public Builder() {
             indices = new ArrayList<>();
             customMetadataMap = new HashMap<>();
             indicesRouting = new ArrayList<>();
+            clusterStateCustomMetadataMap = new HashMap<>();
         }
 
         public Builder(ClusterMetadataManifest manifest) {
@@ -908,6 +987,8 @@ public class ClusterMetadataManifest implements Writeable, ToXContentFragment {
             this.diffManifest = manifest.diffManifest;
             this.routingTableVersion = manifest.routingTableVersion;
             this.indicesRouting = new ArrayList<>(manifest.indicesRouting);
+            this.hashesOfConsistentSettings = manifest.uploadedHashesOfConsistentSettings;
+            this.clusterStateCustomMetadataMap = manifest.uploadedClusterStateCustomMap;
         }
 
         public ClusterMetadataManifest build() {
@@ -934,7 +1015,9 @@ public class ClusterMetadataManifest implements Writeable, ToXContentFragment {
                 routingTableVersion,
                 indicesRouting,
                 metadataVersion,
-                transientSettingsMetadata
+                transientSettingsMetadata,
+                hashesOfConsistentSettings,
+                clusterStateCustomMetadataMap
             );
         }
 

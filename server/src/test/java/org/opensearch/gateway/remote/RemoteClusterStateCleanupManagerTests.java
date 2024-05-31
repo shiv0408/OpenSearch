@@ -60,10 +60,10 @@ import static org.opensearch.gateway.remote.RemoteClusterStateServiceTests.gener
 import static org.opensearch.gateway.remote.RemoteClusterStateServiceTests.nodesWithLocalNodeClusterManager;
 import static org.opensearch.gateway.remote.RemoteClusterStateUtils.CLUSTER_STATE_PATH_TOKEN;
 import static org.opensearch.gateway.remote.RemoteClusterStateUtils.DELIMITER;
+import static org.opensearch.gateway.remote.RemoteClusterStateUtils.GLOBAL_METADATA_PATH_TOKEN;
 import static org.opensearch.gateway.remote.RemoteClusterStateUtils.encodeString;
 import static org.opensearch.gateway.remote.RemoteClusterStateUtils.getCusterMetadataBasePath;
 import static org.opensearch.gateway.remote.RemoteGlobalMetadataManager.COORDINATION_METADATA;
-import static org.opensearch.gateway.remote.RemoteGlobalMetadataManager.GLOBAL_METADATA_PATH_TOKEN;
 import static org.opensearch.gateway.remote.RemoteGlobalMetadataManager.SETTING_METADATA;
 import static org.opensearch.gateway.remote.RemoteGlobalMetadataManager.TEMPLATES_METADATA;
 import static org.opensearch.gateway.remote.model.RemoteIndexMetadata.INDEX_PATH_TOKEN;
