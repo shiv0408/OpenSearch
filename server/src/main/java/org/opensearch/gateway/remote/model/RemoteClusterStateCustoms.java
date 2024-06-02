@@ -9,11 +9,15 @@
 package org.opensearch.gateway.remote.model;
 
 import org.opensearch.cluster.ClusterState;
+import org.opensearch.cluster.ClusterState.Custom;
 import org.opensearch.common.io.Streams;
+import org.opensearch.common.remote.AbstractRemoteWritableBlobEntity;
+import org.opensearch.common.remote.BlobPathParameters;
+import org.opensearch.core.compress.Compressor;
+import org.opensearch.core.xcontent.NamedXContentRegistry;
 import org.opensearch.gateway.remote.ClusterMetadataManifest;
 import org.opensearch.gateway.remote.RemoteClusterStateUtils;
 import org.opensearch.index.remote.RemoteStoreUtils;
-import org.opensearch.repositories.blobstore.BlobStoreRepository;
 import org.opensearch.repositories.blobstore.ChecksumBlobStoreFormat;
 
 import java.io.IOException;
@@ -26,7 +30,7 @@ import static org.opensearch.gateway.remote.RemoteClusterStateUtils.DELIMITER;
 import static org.opensearch.gateway.remote.RemoteClusterStateUtils.METADATA_NAME_FORMAT;
 import static org.opensearch.gateway.remote.model.RemoteCustomMetadata.CUSTOM_DELIMITER;
 
-public class RemoteClusterStateCustoms extends AbstractRemoteBlobObject<ClusterState.Custom> {
+public class RemoteClusterStateCustoms extends AbstractRemoteWritableBlobEntity<Custom> {
     public static final String CLUSTER_STATE_CUSTOM = "cluster-state-custom";
 
     public final ChecksumBlobStoreFormat<ClusterState.Custom> clusterStateCustomBlobStoreFormat;
@@ -34,8 +38,8 @@ public class RemoteClusterStateCustoms extends AbstractRemoteBlobObject<ClusterS
     private String customType;
     private ClusterState.Custom custom;
 
-    public RemoteClusterStateCustoms(ClusterState.Custom custom, String customType, long stateVersion, String clusterUUID, BlobStoreRepository blobStoreRepository) {
-        super(blobStoreRepository, clusterUUID);
+    public RemoteClusterStateCustoms(final ClusterState.Custom custom, final String customType, final long stateVersion, final String clusterUUID, final Compressor compressor, final NamedXContentRegistry namedXContentRegistry) {
+        super(clusterUUID, compressor, namedXContentRegistry);
         this.stateVersion = stateVersion;
         this.customType = customType;
         this.custom = custom;
@@ -46,8 +50,8 @@ public class RemoteClusterStateCustoms extends AbstractRemoteBlobObject<ClusterS
         );
     }
 
-    public RemoteClusterStateCustoms(String blobName, String customType, String clusterUUID, BlobStoreRepository blobStoreRepository) {
-        super(blobStoreRepository, clusterUUID);
+    public RemoteClusterStateCustoms(final String blobName, final String customType, final String clusterUUID, final Compressor compressor, final NamedXContentRegistry namedXContentRegistry) {
+        super(clusterUUID, compressor, namedXContentRegistry);
         this.blobName = blobName;
         this.customType = customType;
         this.clusterStateCustomBlobStoreFormat = new ChecksumBlobStoreFormat<>(
@@ -83,6 +87,11 @@ public class RemoteClusterStateCustoms extends AbstractRemoteBlobObject<ClusterS
     }
 
     @Override
+    public void set(Custom custom) {
+        this.custom = custom;
+    }
+
+    @Override
     public ClusterState.Custom get() {
         return custom;
     }
@@ -93,7 +102,7 @@ public class RemoteClusterStateCustoms extends AbstractRemoteBlobObject<ClusterS
     }
 
     @Override
-    public ClusterState.Custom deserialize(InputStream inputStream) throws IOException {
-        return clusterStateCustomBlobStoreFormat.deserialize(blobName, getBlobStoreRepository().getNamedXContentRegistry(), Streams.readFully(inputStream));
+    public ClusterState.Custom deserialize(final InputStream inputStream) throws IOException {
+        return clusterStateCustomBlobStoreFormat.deserialize(blobName, getNamedXContentRegistry(), Streams.readFully(inputStream));
     }
 }

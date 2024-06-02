@@ -8,6 +8,20 @@
 
 package org.opensearch.gateway.remote;
 
+import static org.opensearch.gateway.remote.RemoteClusterStateUtils.DELIMITER;
+import static org.opensearch.gateway.remote.RemoteClusterStateUtils.RemoteStateTransferException;
+import static org.opensearch.gateway.remote.RemoteClusterStateUtils.getCusterMetadataBasePath;
+
+import java.io.IOException;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.opensearch.Version;
@@ -20,27 +34,12 @@ import org.opensearch.common.settings.ClusterSettings;
 import org.opensearch.common.settings.Setting;
 import org.opensearch.common.unit.TimeValue;
 import org.opensearch.core.action.ActionListener;
+import org.opensearch.core.compress.Compressor;
+import org.opensearch.core.xcontent.NamedXContentRegistry;
+import org.opensearch.gateway.remote.model.RemoteClusterStateBlobStore;
 import org.opensearch.gateway.remote.model.RemoteClusterMetadataManifest;
-import org.opensearch.gateway.remote.model.RemoteClusterMetadataManifestBlobStore;
 import org.opensearch.index.remote.RemoteStoreUtils;
-import org.opensearch.index.translog.transfer.BlobStoreTransferService;
 import org.opensearch.repositories.blobstore.BlobStoreRepository;
-
-import java.io.IOException;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
-import java.util.Optional;
-import java.util.Set;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicReference;
-import org.opensearch.threadpool.ThreadPool;
-
-import static org.opensearch.gateway.remote.RemoteClusterStateUtils.DELIMITER;
-import static org.opensearch.gateway.remote.RemoteClusterStateUtils.RemoteStateTransferException;
-import static org.opensearch.gateway.remote.RemoteClusterStateUtils.getCusterMetadataBasePath;
 
 public class RemoteManifestManager {
 
@@ -52,23 +51,24 @@ public class RemoteManifestManager {
         Setting.Property.Dynamic,
         Setting.Property.NodeScope
     );
-
-    private final BlobStoreTransferService blobStoreTransferService;
-    private final BlobStoreRepository blobStoreRepository;
-    private volatile TimeValue metadataManifestUploadTimeout;
-    private final String nodeId;
-    private final ThreadPool threadPool;
-    private final RemoteClusterMetadataManifestBlobStore manifestBlobStore;
     private static final Logger logger = LogManager.getLogger(RemoteManifestManager.class);
 
-    RemoteManifestManager(BlobStoreTransferService blobStoreTransferService, BlobStoreRepository blobStoreRepository, ClusterSettings clusterSettings, String nodeId, ThreadPool threadPool, String clusterName) {
-        this.blobStoreTransferService = blobStoreTransferService;
-        this.blobStoreRepository = blobStoreRepository;
+    private volatile TimeValue metadataManifestUploadTimeout;
+    private final String nodeId;
+    private final RemoteClusterStateBlobStore<ClusterMetadataManifest, RemoteClusterMetadataManifest> manifestBlobStore;
+    private final Compressor compressor;
+    private final NamedXContentRegistry namedXContentRegistry;
+    //todo remove blobStorerepo from here
+    private final BlobStoreRepository blobStoreRepository;
+
+    RemoteManifestManager(RemoteClusterStateBlobStore<ClusterMetadataManifest, RemoteClusterMetadataManifest> manifestBlobStore, ClusterSettings clusterSettings, String nodeId, Compressor compressor, NamedXContentRegistry namedXContentRegistry, BlobStoreRepository blobStoreRepository) {
         this.metadataManifestUploadTimeout = clusterSettings.get(METADATA_MANIFEST_UPLOAD_TIMEOUT_SETTING);
         this.nodeId = nodeId;
-        this.threadPool = threadPool;
-        manifestBlobStore = new RemoteClusterMetadataManifestBlobStore(blobStoreTransferService, blobStoreRepository, clusterName, threadPool);
+        this.manifestBlobStore = manifestBlobStore;
         clusterSettings.addSettingsUpdateConsumer(METADATA_MANIFEST_UPLOAD_TIMEOUT_SETTING, this::setMetadataManifestUploadTimeout);
+        this.compressor = compressor;
+        this.namedXContentRegistry = namedXContentRegistry;
+        this.blobStoreRepository = blobStoreRepository;
     }
 
     ClusterMetadataManifest uploadManifest(
@@ -119,7 +119,7 @@ public class RemoteManifestManager {
             logger.trace(String.format(Locale.ROOT, "Manifest file uploaded successfully."));
         }, ex -> { exceptionReference.set(ex); }), latch);
 
-        RemoteClusterMetadataManifest remoteClusterMetadataManifest = new RemoteClusterMetadataManifest(uploadManifest, clusterUUID, blobStoreRepository);
+        RemoteClusterMetadataManifest remoteClusterMetadataManifest = new RemoteClusterMetadataManifest(uploadManifest, clusterUUID, compressor, namedXContentRegistry);
         manifestBlobStore.writeAsync(remoteClusterMetadataManifest, completionListener);
 
         try {
@@ -183,8 +183,8 @@ public class RemoteManifestManager {
         throws IllegalStateException {
         try {
             String fullBlobName = getManifestFolderPath(clusterName, clusterUUID).buildAsString() + filename;
-            RemoteClusterMetadataManifest remoteClusterMetadataManifest = new RemoteClusterMetadataManifest(fullBlobName, clusterUUID, blobStoreRepository);
-            return manifestBlobStore.read(remoteClusterMetadataManifest);
+            RemoteClusterMetadataManifest remoteClusterMetadataManifest = new RemoteClusterMetadataManifest(fullBlobName, clusterUUID, compressor, namedXContentRegistry);
+            return manifestBlobStore.read(remoteClusterMetadataManifest).get();
         } catch (IOException e) {
             throw new IllegalStateException(String.format(Locale.ROOT, "Error while downloading cluster metadata - %s", filename), e);
         }

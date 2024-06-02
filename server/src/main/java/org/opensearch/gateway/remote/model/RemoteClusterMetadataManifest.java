@@ -14,18 +14,21 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.List;
 import org.opensearch.common.io.Streams;
+import org.opensearch.common.remote.AbstractRemoteWritableBlobEntity;
+import org.opensearch.common.remote.BlobPathParameters;
+import org.opensearch.core.compress.Compressor;
+import org.opensearch.core.xcontent.NamedXContentRegistry;
 import org.opensearch.gateway.remote.ClusterMetadataManifest;
 import org.opensearch.gateway.remote.ClusterMetadataManifest.UploadedMetadata;
 import org.opensearch.gateway.remote.ClusterMetadataManifest.UploadedMetadataAttribute;
 import org.opensearch.gateway.remote.RemoteClusterStateUtils;
 import org.opensearch.index.remote.RemoteStoreUtils;
-import org.opensearch.repositories.blobstore.BlobStoreRepository;
 import org.opensearch.repositories.blobstore.ChecksumBlobStoreFormat;
 
 /**
  * Wrapper class for uploading/downloading {@link ClusterMetadataManifest} to/from remote blob store
  */
-public class RemoteClusterMetadataManifest extends AbstractRemoteBlobObject<ClusterMetadataManifest> {
+public class RemoteClusterMetadataManifest extends AbstractRemoteWritableBlobEntity<ClusterMetadataManifest> {
 
     public static final String MANIFEST_PATH_TOKEN = "manifest";
     public static final int SPLITTED_MANIFEST_FILE_LENGTH = 6;
@@ -56,15 +59,15 @@ public class RemoteClusterMetadataManifest extends AbstractRemoteBlobObject<Clus
 
     private ClusterMetadataManifest clusterMetadataManifest;
 
-    public RemoteClusterMetadataManifest(ClusterMetadataManifest clusterMetadataManifest, String clusterUUID,
-        BlobStoreRepository blobStoreRepository) {
-        super(blobStoreRepository, clusterUUID);
+    public RemoteClusterMetadataManifest(final ClusterMetadataManifest clusterMetadataManifest, final String clusterUUID,
+        final Compressor compressor, final NamedXContentRegistry namedXContentRegistry) {
+        super(clusterUUID, compressor, namedXContentRegistry);
         this.clusterMetadataManifest = clusterMetadataManifest;
     }
 
-    public RemoteClusterMetadataManifest(String blobName, String clusterUUID,
-        BlobStoreRepository blobStoreRepository) {
-        super(blobStoreRepository, clusterUUID);
+    public RemoteClusterMetadataManifest(final String blobName, final String clusterUUID,
+        final Compressor compressor, final NamedXContentRegistry namedXContentRegistry) {
+        super(clusterUUID, compressor, namedXContentRegistry);
         this.blobName = blobName;
     }
 
@@ -98,6 +101,11 @@ public class RemoteClusterMetadataManifest extends AbstractRemoteBlobObject<Clus
     }
 
     @Override
+    public void set(final ClusterMetadataManifest manifest) {
+        this.clusterMetadataManifest = manifest;
+    }
+
+    @Override
     public ClusterMetadataManifest get() {
         return clusterMetadataManifest;
     }
@@ -109,9 +117,9 @@ public class RemoteClusterMetadataManifest extends AbstractRemoteBlobObject<Clus
     }
 
     @Override
-    public ClusterMetadataManifest deserialize(InputStream inputStream) throws IOException {
+    public ClusterMetadataManifest deserialize(final InputStream inputStream) throws IOException {
         ChecksumBlobStoreFormat<ClusterMetadataManifest> blobStoreFormat = getClusterMetadataManifestBlobStoreFormat();
-        return blobStoreFormat.deserialize(blobName, getBlobStoreRepository().getNamedXContentRegistry(), Streams.readFully(inputStream));
+        return blobStoreFormat.deserialize(blobName, getNamedXContentRegistry(), Streams.readFully(inputStream));
     }
 
     private int getManifestCodecVersion() {

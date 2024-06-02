@@ -19,17 +19,20 @@ import java.util.List;
 import org.opensearch.cluster.metadata.Metadata;
 import org.opensearch.cluster.metadata.Metadata.Custom;
 import org.opensearch.common.io.Streams;
+import org.opensearch.common.remote.AbstractRemoteWritableBlobEntity;
+import org.opensearch.common.remote.BlobPathParameters;
+import org.opensearch.core.compress.Compressor;
+import org.opensearch.core.xcontent.NamedXContentRegistry;
 import org.opensearch.gateway.remote.ClusterMetadataManifest.UploadedMetadata;
 import org.opensearch.gateway.remote.ClusterMetadataManifest.UploadedMetadataAttribute;
 import org.opensearch.gateway.remote.RemoteClusterStateUtils;
 import org.opensearch.index.remote.RemoteStoreUtils;
-import org.opensearch.repositories.blobstore.BlobStoreRepository;
 import org.opensearch.repositories.blobstore.ChecksumBlobStoreFormat;
 
 /**
  * Wrapper class for uploading/downloading {@link Custom} to/from remote blob store
  */
-public class RemoteCustomMetadata extends AbstractRemoteBlobObject<Custom> {
+public class RemoteCustomMetadata extends AbstractRemoteWritableBlobEntity<Custom> {
 
     public static final String CUSTOM_METADATA = "custom";
     public static final String CUSTOM_DELIMITER = "--";
@@ -45,9 +48,9 @@ public class RemoteCustomMetadata extends AbstractRemoteBlobObject<Custom> {
     private final String customType;
     private long metadataVersion;
 
-    public RemoteCustomMetadata(Custom custom, String customType, long metadataVersion, String clusterUUID,
-        BlobStoreRepository blobStoreRepository) {
-        super(blobStoreRepository, clusterUUID);
+    public RemoteCustomMetadata(final Custom custom, final String customType, final long metadataVersion, final String clusterUUID,
+        Compressor compressor, NamedXContentRegistry namedXContentRegistry) {
+        super(clusterUUID, compressor, namedXContentRegistry);
         this.custom = custom;
         this.customType = customType;
         this.metadataVersion = metadataVersion;
@@ -58,9 +61,9 @@ public class RemoteCustomMetadata extends AbstractRemoteBlobObject<Custom> {
         );
     }
 
-    public RemoteCustomMetadata(String blobName, String customType, String clusterUUID,
-        BlobStoreRepository blobStoreRepository) {
-        super(blobStoreRepository, clusterUUID);
+    public RemoteCustomMetadata(final String blobName, final String customType, final String clusterUUID,
+        final Compressor compressor, final NamedXContentRegistry namedXContentRegistry) {
+        super(clusterUUID, compressor, namedXContentRegistry);
         this.blobName = blobName;
         this.customType = customType;
         this.customBlobStoreFormat = new ChecksumBlobStoreFormat<>(
@@ -92,6 +95,11 @@ public class RemoteCustomMetadata extends AbstractRemoteBlobObject<Custom> {
     }
 
     @Override
+    public void set(final Custom custom) {
+        this.custom = custom;
+    }
+
+    @Override
     public Custom get() {
         return custom;
     }
@@ -102,8 +110,8 @@ public class RemoteCustomMetadata extends AbstractRemoteBlobObject<Custom> {
     }
 
     @Override
-    public Custom deserialize(InputStream inputStream) throws IOException {
-        return customBlobStoreFormat.deserialize(blobName, getBlobStoreRepository().getNamedXContentRegistry(), Streams.readFully(inputStream));
+    public Custom deserialize(final InputStream inputStream) throws IOException {
+        return customBlobStoreFormat.deserialize(blobName, getNamedXContentRegistry(), Streams.readFully(inputStream));
     }
 
     @Override

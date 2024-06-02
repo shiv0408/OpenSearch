@@ -20,6 +20,10 @@ import org.opensearch.core.xcontent.XContentBuilder;
 import org.opensearch.core.xcontent.XContentParser;
 import org.opensearch.gateway.remote.ClusterMetadataManifest.UploadedIndexMetadata;
 import org.opensearch.gateway.remote.ClusterMetadataManifest.UploadedMetadataAttribute;
+import org.opensearch.gateway.remote.model.RemoteCoordinationMetadata;
+import org.opensearch.gateway.remote.model.RemoteCustomMetadata;
+import org.opensearch.gateway.remote.model.RemotePersistentSettingsMetadata;
+import org.opensearch.gateway.remote.model.RemoteTemplatesMetadata;
 import org.opensearch.test.EqualsHashCodeTestUtils;
 import org.opensearch.test.OpenSearchTestCase;
 
@@ -104,22 +108,22 @@ public class ClusterMetadataManifestTests extends OpenSearchTestCase {
             .indices(Collections.singletonList(uploadedIndexMetadata))
             .previousClusterUUID("prev-cluster-uuid")
             .clusterUUIDCommitted(true)
-            .coordinationMetadata(new UploadedMetadataAttribute(RemoteGlobalMetadataManager.COORDINATION_METADATA, "coordination-file"))
-            .settingMetadata(new UploadedMetadataAttribute(RemoteGlobalMetadataManager.SETTING_METADATA, "setting-file"))
-            .templatesMetadata(new UploadedMetadataAttribute(RemoteGlobalMetadataManager.TEMPLATES_METADATA, "templates-file"))
+            .coordinationMetadata(new UploadedMetadataAttribute(RemoteCoordinationMetadata.COORDINATION_METADATA, "coordination-file"))
+            .settingMetadata(new UploadedMetadataAttribute(RemotePersistentSettingsMetadata.SETTING_METADATA, "setting-file"))
+            .templatesMetadata(new UploadedMetadataAttribute(RemoteTemplatesMetadata.TEMPLATES_METADATA, "templates-file"))
             .customMetadataMap(Collections.unmodifiableList(
                 Arrays.asList(
                     new UploadedMetadataAttribute(
-                        RemoteGlobalMetadataManager.CUSTOM_METADATA + RemoteGlobalMetadataManager.CUSTOM_DELIMITER
+                        RemoteCustomMetadata.CUSTOM_METADATA + RemoteCustomMetadata.CUSTOM_DELIMITER
                             + RepositoriesMetadata.TYPE,
                         "custom--repositories-file"
                     ),
                     new UploadedMetadataAttribute(
-                        RemoteGlobalMetadataManager.CUSTOM_METADATA + RemoteGlobalMetadataManager.CUSTOM_DELIMITER + IndexGraveyard.TYPE,
+                        RemoteCustomMetadata.CUSTOM_METADATA + RemoteCustomMetadata.CUSTOM_DELIMITER + IndexGraveyard.TYPE,
                         "custom--index_graveyard-file"
                     ),
                     new UploadedMetadataAttribute(
-                        RemoteGlobalMetadataManager.CUSTOM_METADATA + RemoteGlobalMetadataManager.CUSTOM_DELIMITER
+                        RemoteCustomMetadata.CUSTOM_METADATA + RemoteCustomMetadata.CUSTOM_DELIMITER
                             + WeightedRoutingMetadata.TYPE,
                         "custom--weighted_routing_netadata-file"
                     )
@@ -150,22 +154,22 @@ public class ClusterMetadataManifestTests extends OpenSearchTestCase {
             .indices(randomUploadedIndexMetadataList())
             .previousClusterUUID("yfObdx8KSMKKrXf8UyHhM")
             .clusterUUIDCommitted(true)
-            .coordinationMetadata(new UploadedMetadataAttribute(RemoteGlobalMetadataManager.COORDINATION_METADATA, "coordination-file"))
-            .settingMetadata(new UploadedMetadataAttribute(RemoteGlobalMetadataManager.SETTING_METADATA, "setting-file"))
-            .templatesMetadata(new UploadedMetadataAttribute(RemoteGlobalMetadataManager.TEMPLATES_METADATA, "templates-file"))
+            .coordinationMetadata(new UploadedMetadataAttribute(RemoteCoordinationMetadata.COORDINATION_METADATA, "coordination-file"))
+            .settingMetadata(new UploadedMetadataAttribute(RemotePersistentSettingsMetadata.SETTING_METADATA, "setting-file"))
+            .templatesMetadata(new UploadedMetadataAttribute(RemoteTemplatesMetadata.TEMPLATES_METADATA, "templates-file"))
             .customMetadataMap(Collections.unmodifiableList(
                 Arrays.asList(
                     new UploadedMetadataAttribute(
-                        RemoteGlobalMetadataManager.CUSTOM_METADATA + RemoteGlobalMetadataManager.CUSTOM_DELIMITER
+                        RemoteCustomMetadata.CUSTOM_METADATA + RemoteCustomMetadata.CUSTOM_DELIMITER
                             + RepositoriesMetadata.TYPE,
                         "custom--repositories-file"
                     ),
                     new UploadedMetadataAttribute(
-                        RemoteGlobalMetadataManager.CUSTOM_METADATA + RemoteGlobalMetadataManager.CUSTOM_DELIMITER + IndexGraveyard.TYPE,
+                        RemoteCustomMetadata.CUSTOM_METADATA + RemoteCustomMetadata.CUSTOM_DELIMITER + IndexGraveyard.TYPE,
                         "custom--index_graveyard-file"
                     ),
                     new UploadedMetadataAttribute(
-                        RemoteGlobalMetadataManager.CUSTOM_METADATA + RemoteGlobalMetadataManager.CUSTOM_DELIMITER
+                        RemoteCustomMetadata.CUSTOM_METADATA + RemoteCustomMetadata.CUSTOM_DELIMITER
                             + WeightedRoutingMetadata.TYPE,
                         "custom--weighted_routing_netadata-file"
                     )

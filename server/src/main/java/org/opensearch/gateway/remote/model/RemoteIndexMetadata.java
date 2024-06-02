@@ -16,17 +16,20 @@ import java.io.InputStream;
 import java.util.List;
 import org.opensearch.cluster.metadata.IndexMetadata;
 import org.opensearch.common.io.Streams;
+import org.opensearch.common.remote.AbstractRemoteWritableBlobEntity;
+import org.opensearch.common.remote.BlobPathParameters;
+import org.opensearch.core.compress.Compressor;
+import org.opensearch.core.xcontent.NamedXContentRegistry;
 import org.opensearch.gateway.remote.ClusterMetadataManifest.UploadedIndexMetadata;
 import org.opensearch.gateway.remote.ClusterMetadataManifest.UploadedMetadata;
 import org.opensearch.gateway.remote.RemoteClusterStateUtils;
 import org.opensearch.index.remote.RemoteStoreUtils;
-import org.opensearch.repositories.blobstore.BlobStoreRepository;
 import org.opensearch.repositories.blobstore.ChecksumBlobStoreFormat;
 
 /**
  * Wrapper class for uploading/downloading {@link IndexMetadata} to/from remote blob store
  */
-public class RemoteIndexMetadata extends AbstractRemoteBlobObject<IndexMetadata> {
+public class RemoteIndexMetadata extends AbstractRemoteWritableBlobEntity<IndexMetadata> {
 
     public static final int INDEX_METADATA_CURRENT_CODEC_VERSION = 1;
 
@@ -39,20 +42,27 @@ public class RemoteIndexMetadata extends AbstractRemoteBlobObject<IndexMetadata>
 
     private IndexMetadata indexMetadata;
 
-    public RemoteIndexMetadata(IndexMetadata indexMetadata, String clusterUUID, BlobStoreRepository blobStoreRepository) {
-        super(blobStoreRepository, clusterUUID);
+    public RemoteIndexMetadata(final IndexMetadata indexMetadata, final String clusterUUID, final Compressor compressor, final NamedXContentRegistry namedXContentRegistry) {
+        super(clusterUUID, compressor, namedXContentRegistry);
         this.indexMetadata = indexMetadata;
     }
 
-    public RemoteIndexMetadata(String blobName, String clusterUUID, BlobStoreRepository blobStoreRepository) {
-        super(blobStoreRepository, clusterUUID);
+    public RemoteIndexMetadata(final String blobName, final String clusterUUID, final Compressor compressor, final NamedXContentRegistry namedXContentRegistry) {
+        super(clusterUUID, compressor, namedXContentRegistry);
         this.blobName = blobName;
+    }
+
+    @Override
+    public void set(final IndexMetadata indexMetadata) {
+        this.indexMetadata = indexMetadata;
     }
 
     @Override
     public IndexMetadata get() {
         return indexMetadata;
     }
+
+
 
     @Override
     public BlobPathParameters getBlobPathParameters() {
@@ -86,9 +96,9 @@ public class RemoteIndexMetadata extends AbstractRemoteBlobObject<IndexMetadata>
     }
 
     @Override
-    public IndexMetadata deserialize(InputStream inputStream) throws IOException {
+    public IndexMetadata deserialize(final InputStream inputStream) throws IOException {
         // Blob name parameter is redundant
-        return INDEX_METADATA_FORMAT.deserialize(blobName, getBlobStoreRepository().getNamedXContentRegistry(), Streams.readFully(inputStream));
+        return INDEX_METADATA_FORMAT.deserialize(blobName, getNamedXContentRegistry(), Streams.readFully(inputStream));
     }
 
 }

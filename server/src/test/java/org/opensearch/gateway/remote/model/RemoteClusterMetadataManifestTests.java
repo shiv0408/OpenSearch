@@ -8,6 +8,7 @@
 
 package org.opensearch.gateway.remote.model;
 
+import static java.util.stream.Collectors.toList;
 import static org.hamcrest.Matchers.greaterThan;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.lessThanOrEqualTo;
@@ -22,13 +23,21 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.Collections;
 import java.util.List;
+import java.util.function.Function;
+import java.util.stream.Stream;
 import org.junit.After;
 import org.junit.Before;
 import org.opensearch.Version;
+import org.opensearch.cluster.ClusterModule;
 import org.opensearch.common.blobstore.BlobPath;
 import org.opensearch.common.compress.DeflateCompressor;
+import org.opensearch.common.network.NetworkModule;
+import org.opensearch.common.remote.BlobPathParameters;
 import org.opensearch.common.settings.ClusterSettings;
 import org.opensearch.common.settings.Settings;
+import org.opensearch.core.compress.Compressor;
+import org.opensearch.core.compress.NoneCompressor;
+import org.opensearch.core.xcontent.NamedXContentRegistry;
 import org.opensearch.gateway.remote.ClusterMetadataManifest;
 import org.opensearch.gateway.remote.ClusterMetadataManifest.UploadedMetadata;
 import org.opensearch.gateway.remote.ClusterMetadataManifest.UploadedMetadataAttribute;
@@ -36,6 +45,7 @@ import org.opensearch.gateway.remote.ClusterStateDiffManifest;
 import org.opensearch.gateway.remote.RemoteClusterStateUtils;
 import org.opensearch.index.remote.RemoteStoreUtils;
 import org.opensearch.index.translog.transfer.BlobStoreTransferService;
+import org.opensearch.indices.IndicesModule;
 import org.opensearch.repositories.blobstore.BlobStoreRepository;
 import org.opensearch.test.OpenSearchTestCase;
 import org.opensearch.threadpool.TestThreadPool;
@@ -55,6 +65,8 @@ public class RemoteClusterMetadataManifestTests extends OpenSearchTestCase {
     private BlobStoreRepository blobStoreRepository;
     private String clusterName;
     private ClusterSettings clusterSettings;
+    private Compressor compressor;
+    private NamedXContentRegistry namedXContentRegistry;
     private final ThreadPool threadPool = new TestThreadPool(getClass().getName());
 
     @Before
@@ -66,6 +78,14 @@ public class RemoteClusterMetadataManifestTests extends OpenSearchTestCase {
         BlobPath blobPath = new BlobPath().add("/path");
         when(blobStoreRepository.basePath()).thenReturn(blobPath);
         when(blobStoreRepository.getCompressor()).thenReturn(new DeflateCompressor());
+        compressor = new NoneCompressor();
+        namedXContentRegistry = new NamedXContentRegistry(
+            Stream.of(
+                NetworkModule.getNamedXContents().stream(),
+                IndicesModule.getNamedXContents().stream(),
+                ClusterModule.getNamedXWriteables().stream()
+            ).flatMap(Function.identity()).collect(toList())
+        );
         this.clusterName = "test-cluster-name";
     }
 
@@ -77,43 +97,43 @@ public class RemoteClusterMetadataManifestTests extends OpenSearchTestCase {
 
     public void testGet() {
         ClusterMetadataManifest manifest = getClusterMetadataManifest();
-        RemoteClusterMetadataManifest remoteObjectForUpload = new RemoteClusterMetadataManifest(manifest, clusterUUID, blobStoreRepository);
+        RemoteClusterMetadataManifest remoteObjectForUpload = new RemoteClusterMetadataManifest(manifest, clusterUUID, compressor, namedXContentRegistry);
         assertThat(remoteObjectForUpload.get(), is(manifest));
 
-        RemoteClusterMetadataManifest remoteObjectForDownload = new RemoteClusterMetadataManifest(TEST_BLOB_NAME, clusterUUID, blobStoreRepository);
+        RemoteClusterMetadataManifest remoteObjectForDownload = new RemoteClusterMetadataManifest(TEST_BLOB_NAME, clusterUUID, compressor, namedXContentRegistry);
         assertThat(remoteObjectForDownload.get(), nullValue());
     }
 
     public void testClusterUUID() {
         ClusterMetadataManifest manifest = getClusterMetadataManifest();
-        RemoteClusterMetadataManifest remoteObjectForUpload = new RemoteClusterMetadataManifest(manifest, clusterUUID, blobStoreRepository);
+        RemoteClusterMetadataManifest remoteObjectForUpload = new RemoteClusterMetadataManifest(manifest, clusterUUID, compressor, namedXContentRegistry);
         assertThat(remoteObjectForUpload.clusterUUID(), is(clusterUUID));
 
-        RemoteClusterMetadataManifest remoteObjectForDownload = new RemoteClusterMetadataManifest(TEST_BLOB_NAME, clusterUUID, blobStoreRepository);
+        RemoteClusterMetadataManifest remoteObjectForDownload = new RemoteClusterMetadataManifest(TEST_BLOB_NAME, clusterUUID, compressor, namedXContentRegistry);
         assertThat(remoteObjectForDownload.clusterUUID(), is(clusterUUID));
     }
 
     public void testFullBlobName() {
         ClusterMetadataManifest manifest = getClusterMetadataManifest();
-        RemoteClusterMetadataManifest remoteObjectForUpload = new RemoteClusterMetadataManifest(manifest, clusterUUID, blobStoreRepository);
+        RemoteClusterMetadataManifest remoteObjectForUpload = new RemoteClusterMetadataManifest(manifest, clusterUUID, compressor, namedXContentRegistry);
         assertThat(remoteObjectForUpload.getFullBlobName(), nullValue());
 
-        RemoteClusterMetadataManifest remoteObjectForDownload = new RemoteClusterMetadataManifest(TEST_BLOB_NAME, clusterUUID, blobStoreRepository);
+        RemoteClusterMetadataManifest remoteObjectForDownload = new RemoteClusterMetadataManifest(TEST_BLOB_NAME, clusterUUID, compressor, namedXContentRegistry);
         assertThat(remoteObjectForDownload.getFullBlobName(), is(TEST_BLOB_NAME));
     }
 
     public void testBlobFileName() {
         ClusterMetadataManifest manifest = getClusterMetadataManifest();
-        RemoteClusterMetadataManifest remoteObjectForUpload = new RemoteClusterMetadataManifest(manifest, clusterUUID, blobStoreRepository);
+        RemoteClusterMetadataManifest remoteObjectForUpload = new RemoteClusterMetadataManifest(manifest, clusterUUID, compressor, namedXContentRegistry);
         assertThat(remoteObjectForUpload.getBlobFileName(), nullValue());
 
-        RemoteClusterMetadataManifest remoteObjectForDownload = new RemoteClusterMetadataManifest(TEST_BLOB_NAME, clusterUUID, blobStoreRepository);
+        RemoteClusterMetadataManifest remoteObjectForDownload = new RemoteClusterMetadataManifest(TEST_BLOB_NAME, clusterUUID, compressor, namedXContentRegistry);
         assertThat(remoteObjectForDownload.getBlobFileName(), is(TEST_BLOB_FILE_NAME));
     }
 
     public void testBlobPathParameters() {
         ClusterMetadataManifest manifest = getClusterMetadataManifest();
-        RemoteClusterMetadataManifest remoteObjectForUpload = new RemoteClusterMetadataManifest(manifest, clusterUUID, blobStoreRepository);
+        RemoteClusterMetadataManifest remoteObjectForUpload = new RemoteClusterMetadataManifest(manifest, clusterUUID, compressor, namedXContentRegistry);
         BlobPathParameters params = remoteObjectForUpload.getBlobPathParameters();
         assertThat(params.getPathTokens(), is(List.of(MANIFEST_PATH_TOKEN)));
         assertThat(params.getFilePrefix(), is(MANIFEST_FILE_PREFIX));
@@ -121,7 +141,7 @@ public class RemoteClusterMetadataManifestTests extends OpenSearchTestCase {
 
     public void testGenerateBlobFileName() {
         ClusterMetadataManifest manifest = getClusterMetadataManifest();
-        RemoteClusterMetadataManifest remoteObjectForUpload = new RemoteClusterMetadataManifest(manifest, clusterUUID, blobStoreRepository);
+        RemoteClusterMetadataManifest remoteObjectForUpload = new RemoteClusterMetadataManifest(manifest, clusterUUID, compressor, namedXContentRegistry);
         String blobFileName = remoteObjectForUpload.generateBlobFileName();
         String[] nameTokens = blobFileName.split(RemoteClusterStateUtils.DELIMITER);
         assertThat(nameTokens[0], is(MANIFEST_FILE_PREFIX));
@@ -134,7 +154,7 @@ public class RemoteClusterMetadataManifestTests extends OpenSearchTestCase {
 
     public void testGetUploadedMetadata() throws IOException {
         ClusterMetadataManifest manifest = getClusterMetadataManifest();
-        RemoteClusterMetadataManifest remoteObjectForUpload = new RemoteClusterMetadataManifest(manifest, clusterUUID, blobStoreRepository);
+        RemoteClusterMetadataManifest remoteObjectForUpload = new RemoteClusterMetadataManifest(manifest, clusterUUID, compressor, namedXContentRegistry);
         assertThrows(AssertionError.class, remoteObjectForUpload::getUploadedMetadata);
 
         try (InputStream inputStream = remoteObjectForUpload.serialize()) {
@@ -147,7 +167,7 @@ public class RemoteClusterMetadataManifestTests extends OpenSearchTestCase {
 
     public void testSerDe() throws IOException {
         ClusterMetadataManifest manifest = getClusterMetadataManifest();
-        RemoteClusterMetadataManifest remoteObjectForUpload = new RemoteClusterMetadataManifest(manifest, clusterUUID, blobStoreRepository);
+        RemoteClusterMetadataManifest remoteObjectForUpload = new RemoteClusterMetadataManifest(manifest, clusterUUID, compressor, namedXContentRegistry);
         try (InputStream inputStream = remoteObjectForUpload.serialize()) {
             remoteObjectForUpload.setFullBlobName(BlobPath.cleanPath());
             assertThat(inputStream.available(), greaterThan(0));

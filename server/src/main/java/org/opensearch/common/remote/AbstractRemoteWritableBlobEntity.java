@@ -6,31 +6,33 @@
  * compatible open source license.
  */
 
-package org.opensearch.gateway.remote.model;
+package org.opensearch.common.remote;
 
 import static org.opensearch.gateway.remote.RemoteClusterStateUtils.PATH_DELIMITER;
 
 import org.opensearch.common.blobstore.BlobPath;
 import org.opensearch.core.compress.Compressor;
+import org.opensearch.core.xcontent.NamedXContentRegistry;
 import org.opensearch.gateway.remote.ClusterMetadataManifest.UploadedMetadata;
-import org.opensearch.repositories.blobstore.BlobStoreRepository;
 
 /**
- * An extension of {@link RemoteObject} class which caters to the use case of writing to and reading from a blob storage
+ * An extension of {@link RemoteWriteableEntity} class which caters to the use case of writing to and reading from a blob storage
  *
  * @param <T> The class type which can be uploaded to or downloaded from a blob storage.
  */
-public abstract class AbstractRemoteBlobObject<T> implements RemoteObject<T> {
+public abstract class AbstractRemoteWritableBlobEntity<T> implements RemoteWriteableEntity<T> {
 
     protected String blobFileName;
 
     protected String blobName;
-    private final BlobStoreRepository blobStoreRepository;
     private final String clusterUUID;
+    private final Compressor compressor;
+    private final NamedXContentRegistry namedXContentRegistry;
 
-    public AbstractRemoteBlobObject(BlobStoreRepository blobStoreRepository, String clusterUUID) {
-        this.blobStoreRepository = blobStoreRepository;
+    public AbstractRemoteWritableBlobEntity(final String clusterUUID, final Compressor compressor, final NamedXContentRegistry namedXContentRegistry) {
         this.clusterUUID = clusterUUID;
+        this.compressor = compressor;
+        this.namedXContentRegistry = namedXContentRegistry;
     }
 
     public abstract BlobPathParameters getBlobPathParameters();
@@ -45,6 +47,9 @@ public abstract class AbstractRemoteBlobObject<T> implements RemoteObject<T> {
                 return null;
             }
             String[] pathTokens = blobName.split(PATH_DELIMITER);
+            if (pathTokens.length < 1) {
+                return null;
+            }
             blobFileName = pathTokens[pathTokens.length - 1];
         }
         return blobFileName;
@@ -62,12 +67,11 @@ public abstract class AbstractRemoteBlobObject<T> implements RemoteObject<T> {
         this.blobName = blobPath.buildAsString() + blobFileName;
     }
 
-    protected Compressor getCompressor() {
-        return blobStoreRepository.getCompressor();
+    public NamedXContentRegistry getNamedXContentRegistry() {
+        return namedXContentRegistry;
     }
-
-    protected BlobStoreRepository getBlobStoreRepository() {
-        return this.blobStoreRepository;
+    protected Compressor getCompressor() {
+        return compressor;
     }
 
 }

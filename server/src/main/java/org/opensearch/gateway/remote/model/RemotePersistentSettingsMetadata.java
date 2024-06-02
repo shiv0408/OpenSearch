@@ -16,18 +16,21 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.List;
 import org.opensearch.common.io.Streams;
+import org.opensearch.common.remote.AbstractRemoteWritableBlobEntity;
+import org.opensearch.common.remote.BlobPathParameters;
 import org.opensearch.common.settings.Settings;
+import org.opensearch.core.compress.Compressor;
+import org.opensearch.core.xcontent.NamedXContentRegistry;
 import org.opensearch.gateway.remote.ClusterMetadataManifest.UploadedMetadata;
 import org.opensearch.gateway.remote.ClusterMetadataManifest.UploadedMetadataAttribute;
 import org.opensearch.gateway.remote.RemoteClusterStateUtils;
 import org.opensearch.index.remote.RemoteStoreUtils;
-import org.opensearch.repositories.blobstore.BlobStoreRepository;
 import org.opensearch.repositories.blobstore.ChecksumBlobStoreFormat;
 
 /**
  * Wrapper class for uploading/downloading persistent {@link Settings} to/from remote blob store
  */
-public class RemotePersistentSettingsMetadata extends AbstractRemoteBlobObject<Settings> {
+public class RemotePersistentSettingsMetadata extends AbstractRemoteWritableBlobEntity<Settings> {
 
     public static final String SETTING_METADATA = "settings";
 
@@ -40,14 +43,14 @@ public class RemotePersistentSettingsMetadata extends AbstractRemoteBlobObject<S
     private Settings persistentSettings;
     private long metadataVersion;
 
-    public RemotePersistentSettingsMetadata(Settings settings, long metadataVersion, String clusterUUID, BlobStoreRepository blobStoreRepository) {
-        super(blobStoreRepository, clusterUUID);
+    public RemotePersistentSettingsMetadata(final Settings settings, final long metadataVersion, final String clusterUUID, final Compressor compressor, final NamedXContentRegistry namedXContentRegistry) {
+        super(clusterUUID, compressor, namedXContentRegistry);
         this.persistentSettings = settings;
         this.metadataVersion = metadataVersion;
     }
 
-    public RemotePersistentSettingsMetadata(String blobName, String clusterUUID, BlobStoreRepository blobStoreRepository) {
-        super(blobStoreRepository, clusterUUID);
+    public RemotePersistentSettingsMetadata(final String blobName, final String clusterUUID, final Compressor compressor, final NamedXContentRegistry namedXContentRegistry) {
+        super(clusterUUID, compressor, namedXContentRegistry);
         this.blobName = blobName;
     }
 
@@ -70,6 +73,11 @@ public class RemotePersistentSettingsMetadata extends AbstractRemoteBlobObject<S
     }
 
     @Override
+    public void set(final Settings settings) {
+        this.persistentSettings = settings;
+    }
+
+    @Override
     public Settings get() {
         return persistentSettings;
     }
@@ -81,8 +89,8 @@ public class RemotePersistentSettingsMetadata extends AbstractRemoteBlobObject<S
     }
 
     @Override
-    public Settings deserialize(InputStream inputStream) throws IOException {
-        return SETTINGS_METADATA_FORMAT.deserialize(blobName, getBlobStoreRepository().getNamedXContentRegistry(), Streams.readFully(inputStream));
+    public Settings deserialize(final InputStream inputStream) throws IOException {
+        return SETTINGS_METADATA_FORMAT.deserialize(blobName, getNamedXContentRegistry(), Streams.readFully(inputStream));
     }
 
     @Override

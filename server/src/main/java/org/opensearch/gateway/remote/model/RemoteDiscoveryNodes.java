@@ -18,17 +18,20 @@ import java.io.InputStream;
 import java.util.List;
 import org.opensearch.cluster.node.DiscoveryNodes;
 import org.opensearch.common.io.Streams;
+import org.opensearch.common.remote.AbstractRemoteWritableBlobEntity;
+import org.opensearch.common.remote.BlobPathParameters;
+import org.opensearch.core.compress.Compressor;
+import org.opensearch.core.xcontent.NamedXContentRegistry;
 import org.opensearch.gateway.remote.ClusterMetadataManifest.UploadedMetadata;
 import org.opensearch.gateway.remote.ClusterMetadataManifest.UploadedMetadataAttribute;
 import org.opensearch.gateway.remote.RemoteClusterStateUtils;
 import org.opensearch.index.remote.RemoteStoreUtils;
-import org.opensearch.repositories.blobstore.BlobStoreRepository;
 import org.opensearch.repositories.blobstore.ChecksumBlobStoreFormat;
 
 /**
  * Wrapper class for uploading/downloading {@link DiscoveryNodes} to/from remote blob store
  */
-public class RemoteDiscoveryNodes extends AbstractRemoteBlobObject<DiscoveryNodes> {
+public class RemoteDiscoveryNodes extends AbstractRemoteWritableBlobEntity<DiscoveryNodes> {
 
     public static final String DISCOVERY_NODES = "nodes";
     public static final ChecksumBlobStoreFormat<DiscoveryNodes> DISCOVERY_NODES_FORMAT = new ChecksumBlobStoreFormat<>(
@@ -40,14 +43,14 @@ public class RemoteDiscoveryNodes extends AbstractRemoteBlobObject<DiscoveryNode
     private DiscoveryNodes discoveryNodes;
     private long stateVersion;
 
-    public RemoteDiscoveryNodes(DiscoveryNodes discoveryNodes, long stateVersion,  String clusterUUID, BlobStoreRepository blobStoreRepository) {
-        super(blobStoreRepository, clusterUUID);
+    public RemoteDiscoveryNodes(final DiscoveryNodes discoveryNodes, final long stateVersion, final String clusterUUID, final Compressor compressor, final NamedXContentRegistry namedXContentRegistry) {
+        super(clusterUUID, compressor, namedXContentRegistry);
         this.discoveryNodes = discoveryNodes;
         this.stateVersion = stateVersion;
     }
 
-    public RemoteDiscoveryNodes(String blobName, String clusterUUID, BlobStoreRepository blobStoreRepository) {
-        super(blobStoreRepository, clusterUUID);
+    public RemoteDiscoveryNodes(final String blobName, final String clusterUUID, final Compressor compressor, final NamedXContentRegistry namedXContentRegistry) {
+        super(clusterUUID, compressor, namedXContentRegistry);
         this.blobName = blobName;
     }
 
@@ -77,6 +80,11 @@ public class RemoteDiscoveryNodes extends AbstractRemoteBlobObject<DiscoveryNode
     }
 
     @Override
+    public void set(final DiscoveryNodes discoveryNodes) {
+        this.discoveryNodes = discoveryNodes;
+    }
+
+    @Override
     public DiscoveryNodes get() {
         return discoveryNodes;
     }
@@ -87,7 +95,7 @@ public class RemoteDiscoveryNodes extends AbstractRemoteBlobObject<DiscoveryNode
     }
 
     @Override
-    public DiscoveryNodes deserialize(InputStream inputStream) throws IOException {
-        return DISCOVERY_NODES_FORMAT.deserialize(blobName, getBlobStoreRepository().getNamedXContentRegistry(), Streams.readFully(inputStream));
+    public DiscoveryNodes deserialize(final InputStream inputStream) throws IOException {
+        return DISCOVERY_NODES_FORMAT.deserialize(blobName, getNamedXContentRegistry(), Streams.readFully(inputStream));
     }
 }

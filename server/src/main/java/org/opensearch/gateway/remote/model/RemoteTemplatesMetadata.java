@@ -17,17 +17,20 @@ import java.io.InputStream;
 import java.util.List;
 import org.opensearch.cluster.metadata.TemplatesMetadata;
 import org.opensearch.common.io.Streams;
+import org.opensearch.common.remote.AbstractRemoteWritableBlobEntity;
+import org.opensearch.common.remote.BlobPathParameters;
+import org.opensearch.core.compress.Compressor;
+import org.opensearch.core.xcontent.NamedXContentRegistry;
 import org.opensearch.gateway.remote.ClusterMetadataManifest.UploadedMetadata;
 import org.opensearch.gateway.remote.ClusterMetadataManifest.UploadedMetadataAttribute;
 import org.opensearch.gateway.remote.RemoteClusterStateUtils;
 import org.opensearch.index.remote.RemoteStoreUtils;
-import org.opensearch.repositories.blobstore.BlobStoreRepository;
 import org.opensearch.repositories.blobstore.ChecksumBlobStoreFormat;
 
 /**
  * Wrapper class for uploading/downloading {@link TemplatesMetadata} to/from remote blob store
  */
-public class RemoteTemplatesMetadata extends AbstractRemoteBlobObject<TemplatesMetadata> {
+public class RemoteTemplatesMetadata extends AbstractRemoteWritableBlobEntity<TemplatesMetadata> {
 
     public static final String TEMPLATES_METADATA = "templates";
 
@@ -39,14 +42,14 @@ public class RemoteTemplatesMetadata extends AbstractRemoteBlobObject<TemplatesM
     private TemplatesMetadata templatesMetadata;
     private long metadataVersion;
 
-    public RemoteTemplatesMetadata(TemplatesMetadata templatesMetadata, long metadataVersion, String clusterUUID, BlobStoreRepository blobStoreRepository) {
-        super(blobStoreRepository, clusterUUID);
+    public RemoteTemplatesMetadata(final TemplatesMetadata templatesMetadata, final long metadataVersion, final String clusterUUID, final Compressor compressor, final NamedXContentRegistry namedXContentRegistry) {
+        super(clusterUUID, compressor, namedXContentRegistry);
         this.templatesMetadata = templatesMetadata;
         this.metadataVersion = metadataVersion;
     }
 
-    public RemoteTemplatesMetadata(String blobName, String clusterUUID, BlobStoreRepository blobStoreRepository) {
-        super(blobStoreRepository, clusterUUID);
+    public RemoteTemplatesMetadata(final String blobName, final String clusterUUID, final Compressor compressor, final NamedXContentRegistry namedXContentRegistry) {
+        super(clusterUUID, compressor, namedXContentRegistry);
         this.blobName = blobName;
     }
 
@@ -71,6 +74,11 @@ public class RemoteTemplatesMetadata extends AbstractRemoteBlobObject<TemplatesM
     }
 
     @Override
+    public void set(final TemplatesMetadata templatesMetadata) {
+        this.templatesMetadata = templatesMetadata;
+    }
+
+    @Override
     public TemplatesMetadata get() {
         return templatesMetadata;
     }
@@ -82,8 +90,8 @@ public class RemoteTemplatesMetadata extends AbstractRemoteBlobObject<TemplatesM
     }
 
     @Override
-    public TemplatesMetadata deserialize(InputStream inputStream) throws IOException {
-        return TEMPLATES_METADATA_FORMAT.deserialize(blobName, getBlobStoreRepository().getNamedXContentRegistry(), Streams.readFully(inputStream));
+    public TemplatesMetadata deserialize(final InputStream inputStream) throws IOException {
+        return TEMPLATES_METADATA_FORMAT.deserialize(blobName, getNamedXContentRegistry(), Streams.readFully(inputStream));
     }
 
     @Override

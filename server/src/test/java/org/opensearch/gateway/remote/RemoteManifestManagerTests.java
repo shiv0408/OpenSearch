@@ -8,6 +8,7 @@
 
 package org.opensearch.gateway.remote;
 
+import static java.util.stream.Collectors.toList;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
@@ -17,18 +18,28 @@ import static org.opensearch.gateway.remote.RemoteClusterStateServiceTests.nodes
 import static org.opensearch.gateway.remote.RemoteClusterStateUtils.DELIMITER;
 
 import java.io.IOException;
+import java.util.function.Function;
+import java.util.stream.Stream;
 import org.junit.After;
 import org.junit.Before;
+import org.opensearch.cluster.ClusterModule;
 import org.opensearch.cluster.ClusterState;
 import org.opensearch.common.blobstore.BlobContainer;
 import org.opensearch.common.blobstore.BlobPath;
 import org.opensearch.common.blobstore.BlobStore;
+import org.opensearch.common.network.NetworkModule;
 import org.opensearch.common.settings.ClusterSettings;
 import org.opensearch.common.settings.Settings;
+import org.opensearch.core.compress.NoneCompressor;
+import org.opensearch.core.xcontent.NamedXContentRegistry;
+import org.opensearch.gateway.remote.model.RemoteClusterMetadataManifest;
+import org.opensearch.gateway.remote.model.RemoteClusterStateBlobStore;
 import org.opensearch.index.translog.transfer.BlobStoreTransferService;
+import org.opensearch.indices.IndicesModule;
 import org.opensearch.repositories.blobstore.BlobStoreRepository;
 import org.opensearch.test.OpenSearchTestCase;
 import org.opensearch.threadpool.TestThreadPool;
+import org.opensearch.threadpool.ThreadPool;
 
 public class RemoteManifestManagerTests extends OpenSearchTestCase {
     private RemoteManifestManager remoteManifestManager;
@@ -41,8 +52,16 @@ public class RemoteManifestManagerTests extends OpenSearchTestCase {
     public void setup() {
         clusterSettings = new ClusterSettings(Settings.EMPTY, ClusterSettings.BUILT_IN_CLUSTER_SETTINGS);
         blobStoreRepository = mock(BlobStoreRepository.class);
-        remoteManifestManager = new RemoteManifestManager(blobStoreTransferService, blobStoreRepository, clusterSettings, "test-node-id", new TestThreadPool("test"), "test-cluster-name");
+        NamedXContentRegistry xContentRegistry = new NamedXContentRegistry(
+            Stream.of(
+                NetworkModule.getNamedXContents().stream(),
+                IndicesModule.getNamedXContents().stream(),
+                ClusterModule.getNamedXWriteables().stream()
+            ).flatMap(Function.identity()).collect(toList())
+        );
         blobStoreTransferService = mock(BlobStoreTransferService.class);
+        RemoteClusterStateBlobStore<ClusterMetadataManifest, RemoteClusterMetadataManifest> manifestBlobStore = new RemoteClusterStateBlobStore<>(blobStoreTransferService, blobStoreRepository, "test-cluster-name", new TestThreadPool("test"), ThreadPool.Names.GENERIC);
+        remoteManifestManager = new RemoteManifestManager(manifestBlobStore, clusterSettings, "test-node-id", new NoneCompressor(), xContentRegistry, blobStoreRepository);
         blobStore = mock(BlobStore.class);
         when(blobStoreRepository.blobStore()).thenReturn(blobStore);
     }

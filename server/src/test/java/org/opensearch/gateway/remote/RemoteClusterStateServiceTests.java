@@ -45,8 +45,12 @@ import org.opensearch.core.xcontent.NamedXContentRegistry;
 import org.opensearch.gateway.remote.ClusterMetadataManifest.UploadedIndexMetadata;
 import org.opensearch.gateway.remote.ClusterMetadataManifest.UploadedMetadataAttribute;
 import org.opensearch.gateway.remote.model.RemoteClusterMetadataManifest;
+import org.opensearch.gateway.remote.model.RemoteCoordinationMetadata;
 import org.opensearch.gateway.remote.model.RemoteCustomMetadata;
+import org.opensearch.gateway.remote.model.RemoteGlobalMetadata;
 import org.opensearch.gateway.remote.model.RemoteIndexMetadata;
+import org.opensearch.gateway.remote.model.RemotePersistentSettingsMetadata;
+import org.opensearch.gateway.remote.model.RemoteTemplatesMetadata;
 import org.opensearch.index.remote.RemoteIndexPathUploader;
 import org.opensearch.indices.IndicesModule;
 import org.opensearch.repositories.FilterRepository;
@@ -92,9 +96,9 @@ import static org.opensearch.common.util.FeatureFlags.REMOTE_ROUTING_TABLE_EXPER
 import static org.opensearch.gateway.remote.RemoteClusterStateUtils.DELIMITER;
 import static org.opensearch.gateway.remote.RemoteClusterStateUtils.FORMAT_PARAMS;
 import static org.opensearch.gateway.remote.RemoteClusterStateUtils.RemoteStateTransferException;
-import static org.opensearch.gateway.remote.RemoteGlobalMetadataManager.COORDINATION_METADATA;
-import static org.opensearch.gateway.remote.RemoteGlobalMetadataManager.SETTING_METADATA;
-import static org.opensearch.gateway.remote.RemoteGlobalMetadataManager.TEMPLATES_METADATA;
+import static org.opensearch.gateway.remote.model.RemoteCoordinationMetadata.COORDINATION_METADATA;
+import static org.opensearch.gateway.remote.model.RemotePersistentSettingsMetadata.SETTING_METADATA;
+import static org.opensearch.gateway.remote.model.RemoteTemplatesMetadata.TEMPLATES_METADATA;
 import static org.opensearch.gateway.remote.model.RemoteClusterMetadataManifest.MANIFEST_CURRENT_CODEC_VERSION;
 import static org.opensearch.node.remotestore.RemoteStoreNodeAttribute.REMOTE_STORE_CLUSTER_STATE_REPOSITORY_NAME_ATTRIBUTE_KEY;
 import static org.opensearch.node.remotestore.RemoteStoreNodeAttribute.REMOTE_STORE_REPOSITORY_SETTINGS_ATTRIBUTE_KEY_PREFIX;
@@ -1101,7 +1105,7 @@ public class RemoteClusterStateServiceTests extends OpenSearchTestCase {
         BlobContainer blobContainer = mockBlobStoreObjects();
         mockBlobContainerForGlobalMetadata(blobContainer, expectedManifest, expactedMetadata);
 
-        when(blobContainer.readBlob(RemoteGlobalMetadataManager.GLOBAL_METADATA_FORMAT.blobName(globalIndexMetadataName))).thenThrow(
+        when(blobContainer.readBlob(RemoteGlobalMetadata.GLOBAL_METADATA_FORMAT.blobName(globalIndexMetadataName))).thenThrow(
             FileNotFoundException.class
         );
 
@@ -1605,9 +1609,9 @@ public class RemoteClusterStateServiceTests extends OpenSearchTestCase {
         when(blobContainer.readBlob(mockManifestFileName)).thenReturn(new ByteArrayInputStream(bytes.streamInput().readAllBytes()));
         if (codecVersion >= ClusterMetadataManifest.CODEC_V2) {
             String coordinationFileName = getFileNameFromPath(clusterMetadataManifest.getCoordinationMetadata().getUploadedFilename());
-            when(blobContainer.readBlob(RemoteGlobalMetadataManager.COORDINATION_METADATA_FORMAT.blobName(coordinationFileName)))
+            when(blobContainer.readBlob(RemoteCoordinationMetadata.COORDINATION_METADATA_FORMAT.blobName(coordinationFileName)))
                 .thenAnswer((invocationOnMock) -> {
-                    BytesReference bytesReference = RemoteGlobalMetadataManager.COORDINATION_METADATA_FORMAT.serialize(
+                    BytesReference bytesReference = RemoteCoordinationMetadata.COORDINATION_METADATA_FORMAT.serialize(
                         metadata.coordinationMetadata(),
                         coordinationFileName,
                         blobStoreRepository.getCompressor(),
@@ -1617,9 +1621,9 @@ public class RemoteClusterStateServiceTests extends OpenSearchTestCase {
                 });
 
             String settingsFileName = getFileNameFromPath(clusterMetadataManifest.getSettingsMetadata().getUploadedFilename());
-            when(blobContainer.readBlob(RemoteGlobalMetadataManager.SETTINGS_METADATA_FORMAT.blobName(settingsFileName))).thenAnswer(
+            when(blobContainer.readBlob(RemotePersistentSettingsMetadata.SETTINGS_METADATA_FORMAT.blobName(settingsFileName))).thenAnswer(
                 (invocationOnMock) -> {
-                    BytesReference bytesReference = RemoteGlobalMetadataManager.SETTINGS_METADATA_FORMAT.serialize(
+                    BytesReference bytesReference = RemotePersistentSettingsMetadata.SETTINGS_METADATA_FORMAT.serialize(
                         metadata.persistentSettings(),
                         settingsFileName,
                         blobStoreRepository.getCompressor(),
@@ -1630,9 +1634,9 @@ public class RemoteClusterStateServiceTests extends OpenSearchTestCase {
             );
 
             String templatesFileName = getFileNameFromPath(clusterMetadataManifest.getTemplatesMetadata().getUploadedFilename());
-            when(blobContainer.readBlob(RemoteGlobalMetadataManager.TEMPLATES_METADATA_FORMAT.blobName(templatesFileName))).thenAnswer(
+            when(blobContainer.readBlob(RemoteTemplatesMetadata.TEMPLATES_METADATA_FORMAT.blobName(templatesFileName))).thenAnswer(
                 (invocationOnMock) -> {
-                    BytesReference bytesReference = RemoteGlobalMetadataManager.TEMPLATES_METADATA_FORMAT.serialize(
+                    BytesReference bytesReference = RemoteTemplatesMetadata.TEMPLATES_METADATA_FORMAT.serialize(
                         metadata.templatesMetadata(),
                         templatesFileName,
                         blobStoreRepository.getCompressor(),
@@ -1664,9 +1668,9 @@ public class RemoteClusterStateServiceTests extends OpenSearchTestCase {
             }
         } else if (codecVersion == ClusterMetadataManifest.CODEC_V1) {
             String[] splitPath = clusterMetadataManifest.getGlobalMetadataFileName().split("/");
-            when(blobContainer.readBlob(RemoteGlobalMetadataManager.GLOBAL_METADATA_FORMAT.blobName(splitPath[splitPath.length - 1])))
+            when(blobContainer.readBlob(RemoteGlobalMetadata.GLOBAL_METADATA_FORMAT.blobName(splitPath[splitPath.length - 1])))
                 .thenAnswer((invocationOnMock) -> {
-                    BytesReference bytesGlobalMetadata = RemoteGlobalMetadataManager.GLOBAL_METADATA_FORMAT.serialize(
+                    BytesReference bytesGlobalMetadata = RemoteGlobalMetadata.GLOBAL_METADATA_FORMAT.serialize(
                         metadata,
                         "global-metadata-file",
                         blobStoreRepository.getCompressor(),

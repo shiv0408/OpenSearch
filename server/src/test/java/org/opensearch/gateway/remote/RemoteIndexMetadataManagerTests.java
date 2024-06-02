@@ -8,16 +8,28 @@
 
 package org.opensearch.gateway.remote;
 
-import org.opensearch.common.settings.ClusterSettings;
-import org.opensearch.common.settings.Settings;
-import org.opensearch.index.translog.transfer.BlobStoreTransferService;
-import org.opensearch.repositories.blobstore.BlobStoreRepository;
-import org.opensearch.test.OpenSearchTestCase;
+import static java.util.stream.Collectors.toList;
+import static org.mockito.Mockito.mock;
+
+import java.util.function.Function;
+import java.util.stream.Stream;
 import org.junit.After;
 import org.junit.Before;
+import org.opensearch.cluster.ClusterModule;
+import org.opensearch.cluster.metadata.IndexMetadata;
+import org.opensearch.common.network.NetworkModule;
+import org.opensearch.common.settings.ClusterSettings;
+import org.opensearch.common.settings.Settings;
+import org.opensearch.core.compress.NoneCompressor;
+import org.opensearch.core.xcontent.NamedXContentRegistry;
+import org.opensearch.gateway.remote.model.RemoteIndexMetadata;
+import org.opensearch.gateway.remote.model.RemoteClusterStateBlobStore;
+import org.opensearch.index.translog.transfer.BlobStoreTransferService;
+import org.opensearch.indices.IndicesModule;
+import org.opensearch.repositories.blobstore.BlobStoreRepository;
+import org.opensearch.test.OpenSearchTestCase;
 import org.opensearch.threadpool.TestThreadPool;
-
-import static org.mockito.Mockito.mock;
+import org.opensearch.threadpool.ThreadPool;
 
 public class RemoteIndexMetadataManagerTests extends OpenSearchTestCase {
     private RemoteIndexMetadataManager remoteIndexMetadataManager;
@@ -30,7 +42,15 @@ public class RemoteIndexMetadataManagerTests extends OpenSearchTestCase {
         clusterSettings = new ClusterSettings(Settings.EMPTY, ClusterSettings.BUILT_IN_CLUSTER_SETTINGS);
         blobStoreRepository = mock(BlobStoreRepository.class);
         blobStoreTransferService = mock(BlobStoreTransferService.class);
-        remoteIndexMetadataManager = new RemoteIndexMetadataManager(blobStoreRepository, clusterSettings, new TestThreadPool("test"),"cluster-name", blobStoreTransferService);
+        RemoteClusterStateBlobStore<IndexMetadata, RemoteIndexMetadata> blobStore = new RemoteClusterStateBlobStore<>(blobStoreTransferService, blobStoreRepository, "cluster-name", new TestThreadPool("test"), ThreadPool.Names.GENERIC);
+        NamedXContentRegistry xContentRegistry = new NamedXContentRegistry(
+            Stream.of(
+                NetworkModule.getNamedXContents().stream(),
+                IndicesModule.getNamedXContents().stream(),
+                ClusterModule.getNamedXWriteables().stream()
+            ).flatMap(Function.identity()).collect(toList())
+        );
+        remoteIndexMetadataManager = new RemoteIndexMetadataManager(blobStore, clusterSettings, new NoneCompressor(), xContentRegistry);
     }
 
     @After

@@ -8,25 +8,26 @@
 
 package org.opensearch.gateway.remote.model;
 
-import org.opensearch.cluster.metadata.DiffableStringMap;
-import org.opensearch.common.io.Streams;
-import org.opensearch.gateway.remote.ClusterMetadataManifest;
-import org.opensearch.gateway.remote.RemoteClusterStateUtils;
-import org.opensearch.index.remote.RemoteStoreUtils;
-import org.opensearch.repositories.blobstore.BlobStoreRepository;
-import org.opensearch.repositories.blobstore.ChecksumBlobStoreFormat;
-
-import java.io.IOException;
-import java.io.InputStream;
-import java.util.List;
-
 import static org.opensearch.gateway.remote.RemoteClusterStateAttributesManager.CLUSTER_STATE_ATTRIBUTES_CURRENT_CODEC_VERSION;
-import static org.opensearch.gateway.remote.RemoteClusterStateUtils.CLUSTER_STATE_EPHEMERAL_PATH_TOKEN;
 import static org.opensearch.gateway.remote.RemoteClusterStateUtils.DELIMITER;
 import static org.opensearch.gateway.remote.RemoteClusterStateUtils.GLOBAL_METADATA_PATH_TOKEN;
 import static org.opensearch.gateway.remote.RemoteClusterStateUtils.METADATA_NAME_FORMAT;
 
-public class RemoteHashesOfConsistentSettings extends AbstractRemoteBlobObject<DiffableStringMap> {
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.List;
+import org.opensearch.cluster.metadata.DiffableStringMap;
+import org.opensearch.common.io.Streams;
+import org.opensearch.common.remote.AbstractRemoteWritableBlobEntity;
+import org.opensearch.common.remote.BlobPathParameters;
+import org.opensearch.core.compress.Compressor;
+import org.opensearch.core.xcontent.NamedXContentRegistry;
+import org.opensearch.gateway.remote.ClusterMetadataManifest;
+import org.opensearch.gateway.remote.RemoteClusterStateUtils;
+import org.opensearch.index.remote.RemoteStoreUtils;
+import org.opensearch.repositories.blobstore.ChecksumBlobStoreFormat;
+
+public class RemoteHashesOfConsistentSettings extends AbstractRemoteWritableBlobEntity<DiffableStringMap> {
     public static final String HASHES_OF_CONSISTENT_SETTINGS = "hashes-of-consistent-settings";
     public static final ChecksumBlobStoreFormat<DiffableStringMap> HASHES_OF_CONSISTENT_SETTINGS_FORMAT = new ChecksumBlobStoreFormat<>(
         HASHES_OF_CONSISTENT_SETTINGS,
@@ -36,14 +37,14 @@ public class RemoteHashesOfConsistentSettings extends AbstractRemoteBlobObject<D
 
     private DiffableStringMap hashesOfConsistentSettings;
     private long metadataVersion;
-    public RemoteHashesOfConsistentSettings(DiffableStringMap hashesOfConsistentSettings, long metadataVersion, String clusterUUID, BlobStoreRepository blobStoreRepository) {
-        super(blobStoreRepository, clusterUUID);
+    public RemoteHashesOfConsistentSettings(final DiffableStringMap hashesOfConsistentSettings, final long metadataVersion, final String clusterUUID, final Compressor compressor, final NamedXContentRegistry namedXContentRegistry) {
+        super(clusterUUID, compressor, namedXContentRegistry);
         this.metadataVersion = metadataVersion;
         this.hashesOfConsistentSettings = hashesOfConsistentSettings;
     }
 
-    public RemoteHashesOfConsistentSettings(String blobName, String clusterUUID, BlobStoreRepository blobStoreRepository) {
-        super(blobStoreRepository, clusterUUID);
+    public RemoteHashesOfConsistentSettings(final String blobName, final String clusterUUID, final Compressor compressor, final NamedXContentRegistry namedXContentRegistry) {
+        super(clusterUUID, compressor, namedXContentRegistry);
         this.blobName = blobName;
     }
 
@@ -72,6 +73,11 @@ public class RemoteHashesOfConsistentSettings extends AbstractRemoteBlobObject<D
     }
 
     @Override
+    public void set(final DiffableStringMap hashesOfConsistentSettings) {
+        this.hashesOfConsistentSettings = hashesOfConsistentSettings;
+    }
+
+    @Override
     public DiffableStringMap get() {
         return hashesOfConsistentSettings;
     }
@@ -82,7 +88,7 @@ public class RemoteHashesOfConsistentSettings extends AbstractRemoteBlobObject<D
     }
 
     @Override
-    public DiffableStringMap deserialize(InputStream inputStream) throws IOException {
-        return HASHES_OF_CONSISTENT_SETTINGS_FORMAT.deserialize(blobName, getBlobStoreRepository().getNamedXContentRegistry(), Streams.readFully(inputStream));
+    public DiffableStringMap deserialize(final InputStream inputStream) throws IOException {
+        return HASHES_OF_CONSISTENT_SETTINGS_FORMAT.deserialize(blobName, getNamedXContentRegistry(), Streams.readFully(inputStream));
     }
 }

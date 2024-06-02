@@ -17,17 +17,20 @@ import java.io.InputStream;
 import java.util.List;
 import org.opensearch.cluster.block.ClusterBlocks;
 import org.opensearch.common.io.Streams;
+import org.opensearch.common.remote.AbstractRemoteWritableBlobEntity;
+import org.opensearch.common.remote.BlobPathParameters;
+import org.opensearch.core.compress.Compressor;
+import org.opensearch.core.xcontent.NamedXContentRegistry;
 import org.opensearch.gateway.remote.ClusterMetadataManifest.UploadedMetadata;
 import org.opensearch.gateway.remote.ClusterMetadataManifest.UploadedMetadataAttribute;
 import org.opensearch.gateway.remote.RemoteClusterStateUtils;
 import org.opensearch.index.remote.RemoteStoreUtils;
-import org.opensearch.repositories.blobstore.BlobStoreRepository;
 import org.opensearch.repositories.blobstore.ChecksumBlobStoreFormat;
 
 /**
  * Wrapper class for uploading/downloading {@link ClusterBlocks} to/from remote blob store
  */
-public class RemoteClusterBlocks extends AbstractRemoteBlobObject<ClusterBlocks> {
+public class RemoteClusterBlocks extends AbstractRemoteWritableBlobEntity<ClusterBlocks> {
 
     public static final String CLUSTER_BLOCKS = "blocks";
     public static final ChecksumBlobStoreFormat<ClusterBlocks> CLUSTER_BLOCKS_FORMAT = new ChecksumBlobStoreFormat<>(
@@ -39,15 +42,15 @@ public class RemoteClusterBlocks extends AbstractRemoteBlobObject<ClusterBlocks>
     private ClusterBlocks clusterBlocks;
     private long stateVersion;
 
-    public RemoteClusterBlocks(ClusterBlocks clusterBlocks, long stateVersion, String clusterUUID,
-        BlobStoreRepository blobStoreRepository) {
-        super(blobStoreRepository, clusterUUID);
+    public RemoteClusterBlocks(final ClusterBlocks clusterBlocks, long stateVersion, String clusterUUID,
+        final Compressor compressor, final NamedXContentRegistry namedXContentRegistry) {
+        super(clusterUUID, compressor, namedXContentRegistry);
         this.clusterBlocks = clusterBlocks;
         this.stateVersion = stateVersion;
     }
 
-    public RemoteClusterBlocks(String blobName, String clusterUUID, BlobStoreRepository blobStoreRepository) {
-        super(blobStoreRepository, clusterUUID);
+    public RemoteClusterBlocks(final String blobName, final String clusterUUID, final Compressor compressor, final NamedXContentRegistry namedXContentRegistry) {
+        super(clusterUUID, compressor, namedXContentRegistry);
         this.blobName = blobName;
     }
 
@@ -77,6 +80,11 @@ public class RemoteClusterBlocks extends AbstractRemoteBlobObject<ClusterBlocks>
     }
 
     @Override
+    public void set(final ClusterBlocks clusterBlocks) {
+        this.clusterBlocks = clusterBlocks;
+    }
+
+    @Override
     public ClusterBlocks get() {
         return clusterBlocks;
     }
@@ -88,7 +96,7 @@ public class RemoteClusterBlocks extends AbstractRemoteBlobObject<ClusterBlocks>
     }
 
     @Override
-    public ClusterBlocks deserialize(InputStream inputStream) throws IOException {
-        return CLUSTER_BLOCKS_FORMAT.deserialize(blobName, getBlobStoreRepository().getNamedXContentRegistry(), Streams.readFully(inputStream));
+    public ClusterBlocks deserialize(final InputStream inputStream) throws IOException {
+        return CLUSTER_BLOCKS_FORMAT.deserialize(blobName, getNamedXContentRegistry(), Streams.readFully(inputStream));
     }
 }
