@@ -237,7 +237,7 @@ public class RemoteRoutingTableService implements Closeable {
     public CheckedRunnable<IOException> getAsyncIndexMetadataReadAction(
         String uploadedFilename,
         Index index,
-        LatchedActionListener<RemoteIndexRoutingResult> latchedActionListener) {
+        LatchedActionListener<IndexRoutingTable> latchedActionListener) {
         int idx = uploadedFilename.lastIndexOf("/");
         String blobFileName = uploadedFilename.substring(idx+1);
         BlobContainer blobContainer = blobStoreRepository.blobStore().blobContainer( BlobPath.cleanPath().add(uploadedFilename.substring(0,idx)));
@@ -246,7 +246,7 @@ public class RemoteRoutingTableService implements Closeable {
             blobContainer,
             blobFileName,
             threadPool.executor(ThreadPool.Names.GENERIC),
-            ActionListener.wrap(response -> latchedActionListener.onResponse(new RemoteIndexRoutingResult(index.getName(), response.readIndexRoutingTable(index))), latchedActionListener::onFailure)
+            ActionListener.wrap(response -> latchedActionListener.onResponse(response.readIndexRoutingTable(index)), latchedActionListener::onFailure)
         );
     }
 
@@ -255,7 +255,6 @@ public class RemoteRoutingTableService implements Closeable {
             try {
                 listener.onResponse(read(blobContainer, name));
             } catch (Exception e) {
-                logger.error("routing table download failed : ", e);
                 listener.onFailure(e);
             }
         });
@@ -305,24 +304,6 @@ public class RemoteRoutingTableService implements Closeable {
         final Repository repository = repositoriesService.get().repository(remoteStoreRepo);
         assert repository instanceof BlobStoreRepository : "Repository should be instance of BlobStoreRepository";
         blobStoreRepository = (BlobStoreRepository) repository;
-    }
-
-    public static class RemoteIndexRoutingResult {
-        String indexName;
-        IndexRoutingTable indexRoutingTable;
-
-        public RemoteIndexRoutingResult(String indexName, IndexRoutingTable indexRoutingTable) {
-            this.indexName = indexName;
-            this.indexRoutingTable = indexRoutingTable;
-        }
-
-       public String getIndexName() {
-           return indexName;
-       }
-
-       public IndexRoutingTable  getIndexRoutingTable() {
-           return indexRoutingTable;
-       }
     }
 
 }

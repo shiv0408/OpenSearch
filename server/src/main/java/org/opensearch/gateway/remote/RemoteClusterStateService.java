@@ -985,7 +985,7 @@ public class RemoteClusterStateService implements Closeable {
         CountDownLatch latch = new CountDownLatch(totalReadTasks);
         List<CheckedRunnable<IOException>> asyncMetadataReadActions = new ArrayList<>();
         List<RemoteReadResult> readResults = new ArrayList<>();
-        List<RemoteRoutingTableService.RemoteIndexRoutingResult> readIndexRoutingTableResults = new ArrayList<>();
+        List<IndexRoutingTable> readIndexRoutingTableResults = new ArrayList<>();
         List<Exception> exceptionList = Collections.synchronizedList(new ArrayList<>(totalReadTasks));
 
         LatchedActionListener<RemoteReadResult> listener = new LatchedActionListener<>(
@@ -1012,7 +1012,7 @@ public class RemoteClusterStateService implements Closeable {
             );
         }
 
-        LatchedActionListener<RemoteRoutingTableService.RemoteIndexRoutingResult> routingTableLatchedActionListener = new LatchedActionListener<>(
+        LatchedActionListener<IndexRoutingTable> routingTableLatchedActionListener = new LatchedActionListener<>(
             ActionListener.wrap(
                 response -> {
                     logger.debug("Successfully read cluster state component from remote");
@@ -1187,8 +1187,8 @@ public class RemoteClusterStateService implements Closeable {
             }
         });
 
-        readIndexRoutingTableResults.forEach(remoteIndexRoutingResult -> {
-            indicesRouting.put(remoteIndexRoutingResult.getIndexName(), remoteIndexRoutingResult.getIndexRoutingTable());
+        readIndexRoutingTableResults.forEach(indexRoutingTable -> {
+            indicesRouting.put(indexRoutingTable.getIndex().getName(), indexRoutingTable);
         });
 
         metadataBuilder.indices(indexMetadataMap);
