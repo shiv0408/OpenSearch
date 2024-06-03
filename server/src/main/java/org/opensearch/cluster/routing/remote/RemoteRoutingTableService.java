@@ -13,6 +13,8 @@ import org.apache.logging.log4j.Logger;
 import org.apache.lucene.store.IndexInput;
 import org.opensearch.action.LatchedActionListener;
 import org.opensearch.cluster.ClusterState;
+import org.opensearch.cluster.Diff;
+import org.opensearch.cluster.DiffableUtils;
 import org.opensearch.cluster.routing.IndexRoutingTable;
 import org.opensearch.cluster.routing.RoutingTable;
 import org.opensearch.common.CheckedRunnable;
@@ -28,6 +30,8 @@ import org.opensearch.common.settings.Setting;
 import org.opensearch.common.settings.Settings;
 import org.opensearch.common.util.io.IOUtils;
 import org.opensearch.core.action.ActionListener;
+import org.opensearch.core.common.io.stream.StreamInput;
+import org.opensearch.core.common.io.stream.StreamOutput;
 import org.opensearch.core.index.Index;
 import org.opensearch.gateway.remote.ClusterMetadataManifest;
 import org.opensearch.gateway.remote.RemoteClusterStateUtils;
@@ -88,6 +92,19 @@ public class RemoteRoutingTableService implements Closeable {
     private BlobStoreRepository blobStoreRepository;
     private final ThreadPool threadPool;
 
+    private static final DiffableUtils.NonDiffableValueSerializer<String, IndexRoutingTable> CUSTOM_ROUTING_TABLE_VALUE_SERIALIZER = new DiffableUtils.NonDiffableValueSerializer<String, IndexRoutingTable>() {
+        @Override
+        public void write(IndexRoutingTable value, StreamOutput out) throws IOException {
+            value.writeTo(out);
+        }
+
+        @Override
+        public IndexRoutingTable read(StreamInput in, String key) throws IOException {
+            return IndexRoutingTable.readFrom(in);
+        }
+    };
+
+
     public RemoteRoutingTableService(Supplier<RepositoriesService> repositoriesService,
                                      Settings settings,
                                      ThreadPool threadPool) {
@@ -97,19 +114,6 @@ public class RemoteRoutingTableService implements Closeable {
         this.threadPool = threadPool;
     }
 
-    public List<IndexRoutingTable> getChangedIndicesRouting( ClusterState previousClusterState,
-                                   ClusterState clusterState) {
-        Map<String, IndexRoutingTable> previousIndexRoutingTable = previousClusterState.getRoutingTable().getIndicesRouting();
-        List<IndexRoutingTable> changedIndicesRouting = new ArrayList<>();
-        for (IndexRoutingTable indexRouting : clusterState.getRoutingTable().getIndicesRouting().values()) {
-            if (!(previousIndexRoutingTable.containsKey(indexRouting.getIndex().getName()) && indexRouting.equals(previousIndexRoutingTable.get(indexRouting.getIndex().getName())))) {
-                changedIndicesRouting.add(indexRouting);
-                logger.info("changedIndicesRouting {}", indexRouting.prettyPrint());
-            }
-        }
-
-        return changedIndicesRouting;
-    }
 
     public CheckedRunnable<IOException> getIndexRoutingAsyncAction(
         ClusterState clusterState,
@@ -202,7 +206,7 @@ public class RemoteRoutingTableService implements Closeable {
             uploadedIndexRouting -> allUploadedIndicesRouting.put(uploadedIndexRouting.getIndexName(), uploadedIndexRouting)
         );
 
-        indicesRoutingToDelete.forEach(index -> allUploadedIndicesRouting.remove(index));
+        indicesRoutingToDelete.forEach(allUploadedIndicesRouting::remove);
 
         logger.info("allUploadedIndicesRouting ROUTING {}", allUploadedIndicesRouting);
 
@@ -274,33 +278,16 @@ public class RemoteRoutingTableService implements Closeable {
         }).collect(Collectors.toList());
     }
 
-    public static List<String> getIndicesRoutingDeleted(RoutingTable previousRoutingTable, RoutingTable currentRoutingTable) {
-        List<String> deletedIndicesRouting = new ArrayList<>();
-        for(IndexRoutingTable previousIndexRouting: previousRoutingTable.getIndicesRouting().values()) {
-            if(!currentRoutingTable.getIndicesRouting().containsKey(previousIndexRouting.getIndex().getName())) {
-                // Latest Routing Table does not have entry for the index which means the index is deleted
-                deletedIndicesRouting.add(previousIndexRouting.getIndex().getName());
-            }
-        }
-        return deletedIndicesRouting;
+
+    public static DiffableUtils.MapDiff<String, IndexRoutingTable, Map<String, IndexRoutingTable>> getIndicesRoutingMapDiff(RoutingTable before, RoutingTable after) {
+        return DiffableUtils.diff(
+            before.getIndicesRouting(),
+            after.getIndicesRouting(),
+            DiffableUtils.getStringKeySerializer(),
+            CUSTOM_ROUTING_TABLE_VALUE_SERIALIZER
+        );
     }
 
-    public static List<String> getIndicesRoutingUpdated(RoutingTable previousRoutingTable, RoutingTable currentRoutingTable) {
-        List<String> updatedIndicesRouting = new ArrayList<>();
-        for(IndexRoutingTable currentIndicesRouting: currentRoutingTable.getIndicesRouting().values()) {
-            if(!previousRoutingTable.getIndicesRouting().containsKey(currentIndicesRouting.getIndex().getName())) {
-                // Latest Routing Table does not have entry for the index which means the index is created
-                updatedIndicesRouting.add(currentIndicesRouting.getIndex().getName());
-            } else {
-                if(previousRoutingTable.getIndicesRouting().get(currentIndicesRouting.getIndex().getName()).equals(currentIndicesRouting)) {
-                    // if the latest routing table has the same routing table as the previous routing table, then the index is not updated
-                    continue;
-                }
-                updatedIndicesRouting.add(currentIndicesRouting.getIndex().getName());
-            }
-        }
-        return updatedIndicesRouting;
-    }
 
     @Override
     public void close() throws IOException {

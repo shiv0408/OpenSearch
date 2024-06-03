@@ -10,6 +10,7 @@ package org.opensearch.gateway.remote;
 
 import org.apache.lucene.util.packed.DirectMonotonicReader;
 import org.opensearch.cluster.ClusterState;
+import org.opensearch.cluster.DiffableUtils;
 import org.opensearch.cluster.metadata.IndexMetadata;
 import org.opensearch.cluster.metadata.Metadata;
 import org.opensearch.cluster.routing.IndexRoutingTable;
@@ -89,8 +90,14 @@ public class ClusterStateDiffManifest implements ToXContentObject {
                 customMetadataDeleted.add(custom);
             }
         }
-        indicesRoutingUpdated = RemoteRoutingTableService.getIndicesRoutingUpdated(previousState.routingTable(), state.routingTable());
-        indicesRoutingDeleted = RemoteRoutingTableService.getIndicesRoutingDeleted(previousState.routingTable(), state.routingTable());
+
+        DiffableUtils.MapDiff<String, IndexRoutingTable, Map<String, IndexRoutingTable>> routingTableDiff = RemoteRoutingTableService.getIndicesRoutingMapDiff(previousState.getRoutingTable(),
+            state.getRoutingTable());
+
+        indicesRoutingUpdated = new ArrayList<>();
+        routingTableDiff.getUpserts().forEach((k,v) -> indicesRoutingUpdated.add(k));
+
+        indicesRoutingDeleted = routingTableDiff.getDeletes();
         hashesOfConsistentSettingsUpdated = !state.metadata().hashesOfConsistentSettings().equals(previousState.metadata().hashesOfConsistentSettings());
         clusterStateCustomUpdated = new ArrayList<>();
         clusterStateCustomDeleted = new ArrayList<>();

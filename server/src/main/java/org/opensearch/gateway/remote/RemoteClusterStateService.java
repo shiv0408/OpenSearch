@@ -51,6 +51,8 @@ import org.apache.logging.log4j.message.ParameterizedMessage;
 import org.opensearch.action.LatchedActionListener;
 import org.opensearch.cluster.ClusterName;
 import org.opensearch.cluster.ClusterState;
+import org.opensearch.cluster.Diff;
+import org.opensearch.cluster.DiffableUtils;
 import org.opensearch.cluster.block.ClusterBlocks;
 import org.opensearch.cluster.coordination.CoordinationMetadata;
 import org.opensearch.cluster.metadata.DiffableStringMap;
@@ -337,9 +339,12 @@ public class RemoteClusterStateService implements Closeable {
         }
 
         List<IndexRoutingTable> indicesRoutingToUpload = new ArrayList<>();
+        DiffableUtils.MapDiff<String, IndexRoutingTable, Map<String, IndexRoutingTable>> routingTableDiff = null;
         if (remoteRoutingTableService != null) {
-            indicesRoutingToUpload = remoteRoutingTableService.getChangedIndicesRouting(previousClusterState, clusterState);
+            routingTableDiff = RemoteRoutingTableService.getIndicesRoutingMapDiff(previousClusterState.getRoutingTable(), clusterState.getRoutingTable());
+            routingTableDiff.getUpserts().forEach((k, v) -> indicesRoutingToUpload.add(v));
         }
+
         UploadedMetadataResults uploadedMetadataResults;
         // For migration case from codec V0 or V1 to V2, we have added null check on metadata attribute files,
         // If file is empty and codec is 1 then write global metadata.
