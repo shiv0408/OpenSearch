@@ -459,12 +459,24 @@ public class ClusterStateDiffManifest implements ToXContentObject {
         return discoveryNodesUpdated;
     }
 
+    public boolean isHashesOfConsistentSettingsUpdated() {
+        return hashesOfConsistentSettingsUpdated;
+    }
+
     public List<String> getIndicesRoutingUpdated() {
         return indicesRoutingUpdated;
     }
 
     public List<String> getIndicesRoutingDeleted() {
         return indicesRoutingDeleted;
+    }
+
+    public List<String> getClusterStateCustomUpdated() {
+        return clusterStateCustomUpdated;
+    }
+
+    public List<String> getClusterStateCustomDeleted() {
+        return clusterStateCustomDeleted;
     }
 
     public static Builder builder() {

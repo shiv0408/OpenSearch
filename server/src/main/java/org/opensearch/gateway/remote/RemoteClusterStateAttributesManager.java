@@ -33,6 +33,7 @@ import java.util.Map;
 import java.util.Set;
 
 import static org.opensearch.gateway.remote.model.RemoteClusterStateCustoms.CLUSTER_STATE_CUSTOM;
+import static org.opensearch.gateway.remote.model.RemoteCustomMetadata.CUSTOM_DELIMITER;
 
 public class RemoteClusterStateAttributesManager {
     public static final String CLUSTER_STATE_ATTRIBUTE = "cluster_state_attribute";
@@ -100,7 +101,7 @@ public class RemoteClusterStateAttributesManager {
         String uploadedFilename,
         LatchedActionListener<RemoteReadResult> listener
     ) {
-        ActionListener actionListener = ActionListener.wrap(response -> listener.onResponse(new RemoteReadResult((ToXContent) response, CLUSTER_STATE_ATTRIBUTE, component)), listener::onFailure);
+        final ActionListener actionListener = ActionListener.wrap(response -> listener.onResponse(new RemoteReadResult((ToXContent) response, CLUSTER_STATE_ATTRIBUTE, component)), listener::onFailure);
         if (component.equals(RemoteDiscoveryNodes.DISCOVERY_NODES)) {
             RemoteDiscoveryNodes remoteDiscoveryNodes = new RemoteDiscoveryNodes(uploadedFilename, clusterUUID, compressor, namedXContentRegistry);
             return () -> discoveryNodesBlobStore.readAsync(remoteDiscoveryNodes, actionListener);
@@ -108,8 +109,9 @@ public class RemoteClusterStateAttributesManager {
             RemoteClusterBlocks remoteClusterBlocks = new RemoteClusterBlocks(uploadedFilename, clusterUUID, compressor, namedXContentRegistry);
             return () -> clusterBlocksBlobStore.readAsync(remoteClusterBlocks, actionListener);
         } else if (component.equals(CLUSTER_STATE_CUSTOM)) {
+            final ActionListener customActionListener = ActionListener.wrap(response -> listener.onResponse(new RemoteReadResult((ToXContent) response, CLUSTER_STATE_ATTRIBUTE, String.join(CUSTOM_DELIMITER, component, componentName))), listener::onFailure);
             RemoteClusterStateCustoms remoteClusterStateCustoms = new RemoteClusterStateCustoms(uploadedFilename, componentName, clusterUUID, compressor, namedXContentRegistry);
-            return () -> customsBlobStore.readAsync(remoteClusterStateCustoms, actionListener);
+            return () -> customsBlobStore.readAsync(remoteClusterStateCustoms, customActionListener);
         } else {
             throw new RemoteStateTransferException("Remote object not found for "+ component);
         }

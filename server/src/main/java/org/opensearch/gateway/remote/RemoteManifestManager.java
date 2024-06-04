@@ -101,7 +101,9 @@ public class RemoteManifestManager {
                 .routingTableVersion(clusterState.getRoutingTable().version())
                 .indicesRouting(uploadedMetadataResult.uploadedIndicesRoutingMetadata)
                 .metadataVersion(clusterState.metadata().version())
-                .transientSettingsMetadata(uploadedMetadataResult.uploadedTransientSettingsMetadata);
+                .transientSettingsMetadata(uploadedMetadataResult.uploadedTransientSettingsMetadata)
+                .clusterStateCustomMetadataMap(uploadedMetadataResult.uploadedClusterStateCustomMetadataMap)
+                .hashesOfConsistentSettings(uploadedMetadataResult.uploadedHashesOfConsistentSettings);
             final ClusterMetadataManifest manifest = manifestBuilder.build();
             writeMetadataManifest(clusterState.getClusterName().value(), clusterState.metadata().clusterUUID(), manifest);
             return manifest;

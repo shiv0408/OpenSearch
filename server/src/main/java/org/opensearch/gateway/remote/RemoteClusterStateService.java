@@ -637,12 +637,11 @@ public class RemoteClusterStateService implements Closeable {
             );
         });
         clusterStateCustomToUpload.forEach((key, value) -> {
-            String customComponent = String.join(CUSTOM_DELIMITER, CLUSTER_STATE_CUSTOM, key);
             uploadTasks.put(
-                customComponent,
+                key,
                 remoteClusterStateAttributesManager.getAsyncMetadataWriteAction(
                     clusterState,
-                    customComponent,
+                    key,
                     value,
                     listener
                 )
@@ -977,11 +976,14 @@ public class RemoteClusterStateService implements Closeable {
         boolean readTemplatesMetadata,
         boolean readDiscoveryNodes,
         boolean readClusterBlocks,
-        List<UploadedIndexMetadata> indicesRoutingToRead
+        List<UploadedIndexMetadata> indicesRoutingToRead,
+        boolean readHashesOfConsistentSettings,
+        Map<String, UploadedMetadataAttribute> clusterStateCustomToRead
     ) throws IOException {
         int totalReadTasks =
             indicesToRead.size() + customToRead.size() + indicesRoutingToRead.size() + (readCoordinationMetadata ? 1 : 0) + (readSettingsMetadata ? 1 : 0) + (
-                readTemplatesMetadata ? 1 : 0) + (readDiscoveryNodes ? 1 : 0) + (readClusterBlocks ? 1 : 0) + (readTransientSettingsMetadata ? 1 : 0);
+                readTemplatesMetadata ? 1 : 0) + (readDiscoveryNodes ? 1 : 0) + (readClusterBlocks ? 1 : 0) + (readTransientSettingsMetadata ? 1 : 0) + (readHashesOfConsistentSettings ? 1 : 0)
+                + clusterStateCustomToRead.size();
         CountDownLatch latch = new CountDownLatch(totalReadTasks);
         List<CheckedRunnable<IOException>> asyncMetadataReadActions = new ArrayList<>();
         List<RemoteReadResult> readResults = Collections.synchronizedList(new ArrayList<>());
@@ -1120,6 +1122,30 @@ public class RemoteClusterStateService implements Closeable {
             );
         }
 
+        if (readHashesOfConsistentSettings) {
+            asyncMetadataReadActions.add(
+                remoteGlobalMetadataManager.getAsyncMetadataReadAction(
+                    clusterUUID,
+                    HASHES_OF_CONSISTENT_SETTINGS,
+                    HASHES_OF_CONSISTENT_SETTINGS,
+                    manifest.getHashesOfConsistentSettings().getUploadedFilename(),
+                    listener
+                )
+            );
+        }
+
+        for (Map.Entry<String, UploadedMetadataAttribute> entry : clusterStateCustomToRead.entrySet()) {
+            asyncMetadataReadActions.add(
+                remoteClusterStateAttributesManager.getAsyncMetadataReadAction(
+                    clusterUUID,
+                    CLUSTER_STATE_CUSTOM,
+                    entry.getKey(),
+                    entry.getValue().getUploadedFilename(),
+                    listener
+                )
+            );
+        }
+
         for (CheckedRunnable<IOException> asyncMetadataReadAction : asyncMetadataReadActions) {
             asyncMetadataReadAction.run();
         }
@@ -1175,11 +1201,17 @@ public class RemoteClusterStateService implements Closeable {
                 case TEMPLATES_METADATA:
                     metadataBuilder.templates((TemplatesMetadata) remoteReadResult.getObj());
                     break;
+                case HASHES_OF_CONSISTENT_SETTINGS:
+                    metadataBuilder.hashesOfConsistentSettings((DiffableStringMap) remoteReadResult.getObj());
                 case CLUSTER_STATE_ATTRIBUTE:
                     if (remoteReadResult.getComponentName().equals(DISCOVERY_NODES)) {
                         discoveryNodesBuilder.set(DiscoveryNodes.builder((DiscoveryNodes) remoteReadResult.getObj()));
                     } else if (remoteReadResult.getComponentName().equals(CLUSTER_BLOCKS)) {
                         clusterStateBuilder.blocks((ClusterBlocks) remoteReadResult.getObj());
+                    } else if (remoteReadResult.getComponentName().startsWith(CLUSTER_STATE_CUSTOM)) {
+                        // component name for mat is "cluster-state-custom--custom_name"
+                        String custom = remoteReadResult.getComponentName().split(CUSTOM_DELIMITER)[1];
+                        clusterStateBuilder.putCustom(custom, (ClusterState.Custom) remoteReadResult.getObj());
                     }
                     break;
                 default:
@@ -1218,7 +1250,9 @@ public class RemoteClusterStateService implements Closeable {
             manifest.getTemplatesMetadata() != null,
             includeEphemeral && manifest.getDiscoveryNodesMetadata() != null,
             includeEphemeral && manifest.getClusterBlocksMetadata() != null,
-            includeEphemeral ? manifest.getIndicesRouting() : Collections.emptyList()
+            includeEphemeral ? manifest.getIndicesRouting() : Collections.emptyList(),
+            includeEphemeral && manifest.getHashesOfConsistentSettings() != null,
+            includeEphemeral ? manifest.getClusterStateCustomMap() : Collections.emptyMap()
         );
     }
 
@@ -1242,6 +1276,12 @@ public class RemoteClusterStateService implements Closeable {
                 updatedCustomMetadata.put(customType, manifest.getCustomMetadataMap().get(customType));
             }
         }
+        Map<String, UploadedMetadataAttribute> updatedClusterStateCustom = new HashMap<>();
+        if (diff.getClusterStateCustomUpdated() != null) {
+            for (String customType : diff.getClusterStateCustomUpdated()) {
+                updatedClusterStateCustom.put(customType, manifest.getClusterStateCustomMap().get(customType));
+            }
+        }
         ClusterState updatedClusterState = readClusterStateInParallel(
             previousState,
             manifest,
@@ -1256,7 +1296,9 @@ public class RemoteClusterStateService implements Closeable {
             diff.isTemplatesMetadataUpdated(),
             diff.isDiscoveryNodesUpdated(),
             diff.isClusterBlocksUpdated(),
-            updatedIndexRouting
+            updatedIndexRouting,
+            diff.isHashesOfConsistentSettingsUpdated(),
+            updatedClusterStateCustom
         );
         ClusterState.Builder clusterStateBuilder = ClusterState.builder(updatedClusterState);
         Metadata.Builder metadataBuilder = Metadata.builder(updatedClusterState.metadata());
@@ -1268,6 +1310,13 @@ public class RemoteClusterStateService implements Closeable {
         if (diff.getCustomMetadataDeleted() != null) {
             for (String customType : diff.getCustomMetadataDeleted()) {
                 metadataBuilder.removeCustom(customType);
+            }
+        }
+
+        // remove the deleted cluster state customs from the metadata
+        if (diff.getClusterStateCustomDeleted() != null) {
+            for (String customType : diff.getClusterStateCustomDeleted()) {
+                clusterStateBuilder.removeCustom(customType);
             }
         }
 
