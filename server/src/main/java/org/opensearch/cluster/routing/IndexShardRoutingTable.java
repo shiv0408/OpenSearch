@@ -738,7 +738,7 @@ public class IndexShardRoutingTable implements Iterable<ShardRouting> {
         IndexShardRoutingTable that = (IndexShardRoutingTable) o;
 
         if (!shardId.equals(that.shardId)) return false;
-        if (!shards.equals(that.shards)) return false;
+        if(!new HashSet<>(shards).equals(new HashSet<>(that.shards))) return false;
 
         return true;
     }

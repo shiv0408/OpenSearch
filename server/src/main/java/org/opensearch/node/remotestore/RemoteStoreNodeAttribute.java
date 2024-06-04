@@ -198,11 +198,14 @@ public class RemoteStoreNodeAttribute {
     }
 
     public static boolean isRemoteRoutingTableAttributePresent(Settings settings) {
-        return settings.getByPrefix(Node.NODE_ATTRIBUTES.getKey() + REMOTE_STORE_CLUSTER_STATE_REPOSITORY_NAME_ATTRIBUTE_KEY)
+        return settings.getByPrefix(Node.NODE_ATTRIBUTES.getKey() + REMOTE_STORE_ROUTING_TABLE_REPOSITORY_NAME_ATTRIBUTE_KEY)
             .isEmpty() == false;
     }
 
     public static boolean isRemoteRoutingTableEnabled(Settings settings) {
+        assert FeatureFlags.isEnabled(REMOTE_ROUTING_TABLE_EXPERIMENTAL) == true;
+        assert RemoteRoutingTableService.REMOTE_ROUTING_TABLE_ENABLED_SETTING.get(settings) == true;
+        assert isRemoteRoutingTableAttributePresent(settings) == true;
         return FeatureFlags.isEnabled(REMOTE_ROUTING_TABLE_EXPERIMENTAL) && RemoteRoutingTableService.REMOTE_ROUTING_TABLE_ENABLED_SETTING.get(settings)
             && isRemoteRoutingTableAttributePresent(settings);
     }
