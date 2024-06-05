@@ -984,8 +984,8 @@ public class RemoteClusterStateService implements Closeable {
                 readTemplatesMetadata ? 1 : 0) + (readDiscoveryNodes ? 1 : 0) + (readClusterBlocks ? 1 : 0) + (readTransientSettingsMetadata ? 1 : 0);
         CountDownLatch latch = new CountDownLatch(totalReadTasks);
         List<CheckedRunnable<IOException>> asyncMetadataReadActions = new ArrayList<>();
-        List<RemoteReadResult> readResults = new ArrayList<>();
-        List<IndexRoutingTable> readIndexRoutingTableResults = new ArrayList<>();
+        List<RemoteReadResult> readResults = Collections.synchronizedList(new ArrayList<>());
+        List<IndexRoutingTable> readIndexRoutingTableResults = Collections.synchronizedList(new ArrayList<>());
         List<Exception> exceptionList = Collections.synchronizedList(new ArrayList<>(totalReadTasks));
 
         LatchedActionListener<RemoteReadResult> listener = new LatchedActionListener<>(
