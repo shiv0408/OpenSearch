@@ -53,7 +53,7 @@ public class RemoteClusterStateBlobStore<T, U extends AbstractRemoteWritableBlob
             try (InputStream inputStream = entity.serialize()) {
                 BlobPath blobPath = getBlobPathForUpload(entity);
                 entity.setFullBlobName(blobPath);
-                transferService.uploadBlob(inputStream, getBlobPathForUpload(entity), entity.getBlobFileName(), WritePriority.URGENT, listener);
+                transferService.uploadBlobAsync(inputStream, getBlobPathForUpload(entity), entity.getBlobFileName(), WritePriority.URGENT, listener);
             }
         } catch (Exception e) {
             listener.onFailure(e);

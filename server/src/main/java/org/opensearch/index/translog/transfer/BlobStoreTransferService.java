@@ -20,14 +20,12 @@ import org.opensearch.common.blobstore.BlobMetadata;
 import org.opensearch.common.blobstore.BlobPath;
 import org.opensearch.common.blobstore.BlobStore;
 import org.opensearch.common.blobstore.FetchBlobResult;
-import org.opensearch.common.blobstore.stream.write.WriteContext;
 import org.opensearch.common.blobstore.stream.write.WritePriority;
 import org.opensearch.common.blobstore.transfer.RemoteTransferContainer;
 import org.opensearch.common.blobstore.transfer.stream.OffsetRangeFileInputStream;
 import org.opensearch.common.blobstore.transfer.stream.OffsetRangeIndexInputStream;
 import org.opensearch.common.lucene.store.ByteArrayIndexInput;
 import org.opensearch.core.action.ActionListener;
-import org.opensearch.core.common.bytes.BytesReference;
 import org.opensearch.index.store.exception.ChecksumCombinationException;
 import org.opensearch.index.translog.ChannelFactory;
 import org.opensearch.index.translog.transfer.FileSnapshot.TransferFileSnapshot;
@@ -111,7 +109,7 @@ public class BlobStoreTransferService implements TransferService {
     }
 
     @Override
-    public void uploadBlob(InputStream inputStream, Iterable<String> remotePath, String blobName, WritePriority writePriority, ActionListener<Void> listener) throws IOException {
+    public void uploadBlobAsync(InputStream inputStream, Iterable<String> remotePath, String blobName, WritePriority writePriority, ActionListener<Void> listener) throws IOException {
         assert remotePath instanceof BlobPath;
         BlobPath blobPath = (BlobPath) remotePath;
         final BlobContainer blobContainer = blobStore.blobContainer(blobPath);
@@ -135,20 +133,15 @@ public class BlobStoreTransferService implements TransferService {
                 );
             }
 
-            try (
-                RemoteTransferContainer remoteTransferContainer = new RemoteTransferContainer(
-                    blobName,
-                    blobName,
-                    bytes.length,
-                    true,
-                    writePriority,
-                    (size, position) -> new OffsetRangeIndexInputStream(input, size, position),
-                    expectedChecksum,
-                    ((AsyncMultiStreamBlobContainer) blobContainer).remoteIntegrityCheckSupported()
-                )
-            ) {
-                ((AsyncMultiStreamBlobContainer) blobContainer).asyncBlobUpload(remoteTransferContainer.createWriteContext(), listener);
-            }
+            asyncBlobUpload(blobName,
+                blobName,
+                bytes.length,
+                blobPath,
+                writePriority,
+                (size, position) -> new OffsetRangeIndexInputStream(input, size, position),
+                expectedChecksum,
+                listener
+            );
         }
     }
 
@@ -165,36 +158,21 @@ public class BlobStoreTransferService implements TransferService {
             try (FileChannel channel = channelFactory.open(fileSnapshot.getPath(), StandardOpenOption.READ)) {
                 contentLength = channel.size();
             }
-            boolean remoteIntegrityEnabled = false;
-            BlobContainer blobContainer = blobStore.blobContainer(blobPath);
-            if (blobContainer instanceof AsyncMultiStreamBlobContainer) {
-                remoteIntegrityEnabled = ((AsyncMultiStreamBlobContainer) blobContainer).remoteIntegrityCheckSupported();
-            }
-            RemoteTransferContainer remoteTransferContainer = new RemoteTransferContainer(
-                fileSnapshot.getName(),
-                fileSnapshot.getName(),
-                contentLength,
-                true,
-                writePriority,
-                (size, position) -> new OffsetRangeFileInputStream(fileSnapshot.getPath(), size, position),
-                Objects.requireNonNull(fileSnapshot.getChecksum()),
-                remoteIntegrityEnabled
-            );
             ActionListener<Void> completionListener = ActionListener.wrap(resp -> listener.onResponse(fileSnapshot), ex -> {
                 logger.error(() -> new ParameterizedMessage("Failed to upload blob {}", fileSnapshot.getName()), ex);
                 listener.onFailure(new FileTransferException(fileSnapshot, ex));
             });
 
-            completionListener = ActionListener.runBefore(completionListener, () -> {
-                try {
-                    remoteTransferContainer.close();
-                } catch (Exception e) {
-                    logger.warn("Error occurred while closing streams", e);
-                }
-            });
-
-            WriteContext writeContext = remoteTransferContainer.createWriteContext();
-            ((AsyncMultiStreamBlobContainer) blobStore.blobContainer(blobPath)).asyncBlobUpload(writeContext, completionListener);
+            Objects.requireNonNull(fileSnapshot.getChecksum());
+            asyncBlobUpload(fileSnapshot.getName(),
+                fileSnapshot.getName(),
+                contentLength,
+                blobPath,
+                writePriority,
+                (size, position) -> new OffsetRangeFileInputStream(fileSnapshot.getPath(), size, position),
+                fileSnapshot.getChecksum(),
+                completionListener
+            );
 
         } catch (Exception e) {
             logger.error(() -> new ParameterizedMessage("Failed to upload blob {}", fileSnapshot.getName()), e);
@@ -207,6 +185,24 @@ public class BlobStoreTransferService implements TransferService {
             }
         }
 
+    }
+
+    private void asyncBlobUpload(String fileName, String remoteFileName, long contentLength, BlobPath blobPath, WritePriority writePriority, RemoteTransferContainer.OffsetRangeInputStreamSupplier inputStreamSupplier, long expectedChecksum, ActionListener<Void> completionListener) throws IOException {
+        BlobContainer blobContainer = blobStore.blobContainer(blobPath);
+        assert blobContainer instanceof AsyncMultiStreamBlobContainer;
+        boolean remoteIntegrityEnabled = ((AsyncMultiStreamBlobContainer) blobContainer).remoteIntegrityCheckSupported();
+        try (RemoteTransferContainer remoteTransferContainer = new RemoteTransferContainer(
+            fileName,
+            remoteFileName,
+            contentLength,
+            true,
+            writePriority,
+            inputStreamSupplier,
+            expectedChecksum,
+            remoteIntegrityEnabled
+        )) {
+            ((AsyncMultiStreamBlobContainer) blobContainer).asyncBlobUpload(remoteTransferContainer.createWriteContext(), completionListener);
+        }
     }
 
     @Override
