@@ -73,16 +73,6 @@ public class RemoteTransientSettingsMetadata extends AbstractRemoteWritableBlobE
     }
 
     @Override
-    public void set(final Settings settings) {
-        this.transientSettings = settings;
-    }
-
-    @Override
-    public Settings get() {
-        return transientSettings;
-    }
-
-    @Override
     public InputStream serialize() throws IOException {
         return SETTINGS_METADATA_FORMAT.serialize(transientSettings, generateBlobFileName(), getCompressor(), RemoteClusterStateUtils.FORMAT_PARAMS)
             .streamInput();

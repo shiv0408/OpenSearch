@@ -80,16 +80,6 @@ public class RemoteDiscoveryNodes extends AbstractRemoteWritableBlobEntity<Disco
     }
 
     @Override
-    public void set(final DiscoveryNodes discoveryNodes) {
-        this.discoveryNodes = discoveryNodes;
-    }
-
-    @Override
-    public DiscoveryNodes get() {
-        return discoveryNodes;
-    }
-
-    @Override
     public InputStream serialize() throws IOException {
         return DISCOVERY_NODES_FORMAT.serialize(discoveryNodes, generateBlobFileName(), getCompressor(), RemoteClusterStateUtils.FORMAT_PARAMS).streamInput();
     }

@@ -95,16 +95,6 @@ public class RemoteCustomMetadata extends AbstractRemoteWritableBlobEntity<Custo
     }
 
     @Override
-    public void set(final Custom custom) {
-        this.custom = custom;
-    }
-
-    @Override
-    public Custom get() {
-        return custom;
-    }
-
-    @Override
     public InputStream serialize() throws IOException {
         return customBlobStoreFormat.serialize(custom, generateBlobFileName(), getCompressor(), RemoteClusterStateUtils.FORMAT_PARAMS).streamInput();
     }

@@ -54,16 +54,6 @@ public class RemoteGlobalMetadata extends AbstractRemoteWritableBlobEntity<Metad
     }
 
     @Override
-    public void set(final Metadata metadata) {
-        this.metadata = metadata;
-    }
-
-    @Override
-    public Metadata get() {
-        return metadata;
-    }
-
-    @Override
     public InputStream serialize() throws IOException {
         throw new UnsupportedOperationException();
     }

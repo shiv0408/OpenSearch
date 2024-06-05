@@ -53,18 +53,6 @@ public class RemoteIndexMetadata extends AbstractRemoteWritableBlobEntity<IndexM
     }
 
     @Override
-    public void set(final IndexMetadata indexMetadata) {
-        this.indexMetadata = indexMetadata;
-    }
-
-    @Override
-    public IndexMetadata get() {
-        return indexMetadata;
-    }
-
-
-
-    @Override
     public BlobPathParameters getBlobPathParameters() {
         return new BlobPathParameters(List.of(INDEX_PATH_TOKEN, indexMetadata.getIndexUUID()), "metadata");
     }

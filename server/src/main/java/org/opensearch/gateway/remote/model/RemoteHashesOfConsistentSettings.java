@@ -73,16 +73,6 @@ public class RemoteHashesOfConsistentSettings extends AbstractRemoteWritableBlob
     }
 
     @Override
-    public void set(final DiffableStringMap hashesOfConsistentSettings) {
-        this.hashesOfConsistentSettings = hashesOfConsistentSettings;
-    }
-
-    @Override
-    public DiffableStringMap get() {
-        return hashesOfConsistentSettings;
-    }
-
-    @Override
     public InputStream serialize() throws IOException {
         return HASHES_OF_CONSISTENT_SETTINGS_FORMAT.serialize(hashesOfConsistentSettings, generateBlobFileName(), getCompressor(), RemoteClusterStateUtils.FORMAT_PARAMS).streamInput();
     }

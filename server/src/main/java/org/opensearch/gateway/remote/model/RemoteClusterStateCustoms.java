@@ -87,16 +87,6 @@ public class RemoteClusterStateCustoms extends AbstractRemoteWritableBlobEntity<
     }
 
     @Override
-    public void set(Custom custom) {
-        this.custom = custom;
-    }
-
-    @Override
-    public ClusterState.Custom get() {
-        return custom;
-    }
-
-    @Override
     public InputStream serialize() throws IOException {
         return clusterStateCustomBlobStoreFormat.serialize(custom, generateBlobFileName(), getCompressor(), RemoteClusterStateUtils.FORMAT_PARAMS).streamInput();
     }

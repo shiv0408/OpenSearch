@@ -73,16 +73,6 @@ public class RemotePersistentSettingsMetadata extends AbstractRemoteWritableBlob
     }
 
     @Override
-    public void set(final Settings settings) {
-        this.persistentSettings = settings;
-    }
-
-    @Override
-    public Settings get() {
-        return persistentSettings;
-    }
-
-    @Override
     public InputStream serialize() throws IOException {
         return SETTINGS_METADATA_FORMAT.serialize(persistentSettings, generateBlobFileName(), getCompressor(), RemoteClusterStateUtils.FORMAT_PARAMS)
             .streamInput();

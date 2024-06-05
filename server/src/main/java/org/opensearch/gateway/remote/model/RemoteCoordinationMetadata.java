@@ -73,16 +73,6 @@ public class RemoteCoordinationMetadata extends AbstractRemoteWritableBlobEntity
     }
 
     @Override
-    public void set(final CoordinationMetadata coordinationMetadata) {
-        this.coordinationMetadata = coordinationMetadata;
-    }
-
-    @Override
-    public CoordinationMetadata get() {
-        return coordinationMetadata;
-    }
-
-    @Override
     public InputStream serialize() throws IOException {
         return COORDINATION_METADATA_FORMAT.serialize(coordinationMetadata, generateBlobFileName(), getCompressor(), RemoteClusterStateUtils.FORMAT_PARAMS).streamInput();
     }

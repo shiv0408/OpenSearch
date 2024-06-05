@@ -186,7 +186,7 @@ public class RemoteManifestManager {
         try {
             String fullBlobName = getManifestFolderPath(clusterName, clusterUUID).buildAsString() + filename;
             RemoteClusterMetadataManifest remoteClusterMetadataManifest = new RemoteClusterMetadataManifest(fullBlobName, clusterUUID, compressor, namedXContentRegistry);
-            return manifestBlobStore.read(remoteClusterMetadataManifest).get();
+            return manifestBlobStore.read(remoteClusterMetadataManifest);
         } catch (IOException e) {
             throw new IllegalStateException(String.format(Locale.ROOT, "Error while downloading cluster metadata - %s", filename), e);
         }

@@ -101,16 +101,6 @@ public class RemoteClusterMetadataManifest extends AbstractRemoteWritableBlobEnt
     }
 
     @Override
-    public void set(final ClusterMetadataManifest manifest) {
-        this.clusterMetadataManifest = manifest;
-    }
-
-    @Override
-    public ClusterMetadataManifest get() {
-        return clusterMetadataManifest;
-    }
-
-    @Override
     public InputStream serialize() throws IOException {
         return CLUSTER_METADATA_MANIFEST_FORMAT.serialize(clusterMetadataManifest, generateBlobFileName(), getCompressor(),
             RemoteClusterStateUtils.FORMAT_PARAMS).streamInput();

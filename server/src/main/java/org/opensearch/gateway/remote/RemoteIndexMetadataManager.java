@@ -93,7 +93,7 @@ public class RemoteIndexMetadataManager {
         RemoteIndexMetadata remoteIndexMetadata = new RemoteIndexMetadata(RemoteClusterStateUtils.getFormattedFileName(
             uploadedIndexMetadata.getUploadedFilename(), manifestCodecVersion), clusterUUID, compressor, namedXContentRegistry);
         try {
-            return indexMetadataBlobStore.read(remoteIndexMetadata).get();
+            return indexMetadataBlobStore.read(remoteIndexMetadata);
         } catch (IOException e) {
             throw new IllegalStateException(
                 String.format(Locale.ROOT, "Error while downloading IndexMetadata - %s", uploadedIndexMetadata.getUploadedFilename()),

@@ -74,16 +74,6 @@ public class RemoteTemplatesMetadata extends AbstractRemoteWritableBlobEntity<Te
     }
 
     @Override
-    public void set(final TemplatesMetadata templatesMetadata) {
-        this.templatesMetadata = templatesMetadata;
-    }
-
-    @Override
-    public TemplatesMetadata get() {
-        return templatesMetadata;
-    }
-
-    @Override
     public InputStream serialize() throws IOException {
         return TEMPLATES_METADATA_FORMAT.serialize(templatesMetadata, generateBlobFileName(), getCompressor(), RemoteClusterStateUtils.FORMAT_PARAMS)
             .streamInput();

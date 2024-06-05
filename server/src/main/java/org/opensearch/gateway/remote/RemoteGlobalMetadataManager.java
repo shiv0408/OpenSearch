@@ -193,7 +193,7 @@ public class RemoteGlobalMetadataManager {
             if (globalMetadataFileName != null) {
                 RemoteGlobalMetadata remoteGlobalMetadata = new RemoteGlobalMetadata(globalMetadataFileName, clusterUUID,
                     compressor, namedXContentRegistry);
-                return globalMetadataBlobStore.read(remoteGlobalMetadata).get();
+                return globalMetadataBlobStore.read(remoteGlobalMetadata);
             } else if (clusterMetadataManifest.hasMetadataAttributesFiles()) {
                 CoordinationMetadata coordinationMetadata = getCoordinationMetadata(
                     clusterUUID,
@@ -239,7 +239,7 @@ public class RemoteGlobalMetadataManager {
             if (coordinationMetadataFileName != null) {
                 RemoteCoordinationMetadata remoteCoordinationMetadata = new RemoteCoordinationMetadata(coordinationMetadataFileName, clusterUUID,
                     compressor, namedXContentRegistry);
-                return coordinationMetadataBlobStore.read(remoteCoordinationMetadata).get();
+                return coordinationMetadataBlobStore.read(remoteCoordinationMetadata);
             } else {
                 return CoordinationMetadata.EMPTY_METADATA;
             }
@@ -257,7 +257,7 @@ public class RemoteGlobalMetadataManager {
             if (settingsMetadataFileName != null) {
                 RemotePersistentSettingsMetadata remotePersistentSettingsMetadata = new RemotePersistentSettingsMetadata(settingsMetadataFileName, clusterUUID,
                     compressor, namedXContentRegistry);
-                return persistentSettingsBlobStore.read(remotePersistentSettingsMetadata).get();
+                return persistentSettingsBlobStore.read(remotePersistentSettingsMetadata);
             } else {
                 return Settings.EMPTY;
             }
@@ -275,7 +275,7 @@ public class RemoteGlobalMetadataManager {
             if (templatesMetadataFileName != null) {
                 RemoteTemplatesMetadata remoteTemplatesMetadata = new RemoteTemplatesMetadata(templatesMetadataFileName, clusterUUID,
                     compressor, namedXContentRegistry);
-                return templatesMetadataBlobStore.read(remoteTemplatesMetadata).get();
+                return templatesMetadataBlobStore.read(remoteTemplatesMetadata);
             } else {
                 return TemplatesMetadata.EMPTY_METADATA;
             }
@@ -292,7 +292,7 @@ public class RemoteGlobalMetadataManager {
         try {
             // Fetch Custom metadata
             RemoteCustomMetadata remoteCustomMetadata = new RemoteCustomMetadata(customMetadataFileName, custom, clusterUUID, compressor, namedXContentRegistry);
-            return customMetadataBlobStore.read(remoteCustomMetadata).get();
+            return customMetadataBlobStore.read(remoteCustomMetadata);
         } catch (IOException e) {
             throw new IllegalStateException(
                 String.format(Locale.ROOT, "Error while downloading Custom Metadata - %s", customMetadataFileName),

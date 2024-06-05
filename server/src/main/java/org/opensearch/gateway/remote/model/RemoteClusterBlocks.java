@@ -80,17 +80,6 @@ public class RemoteClusterBlocks extends AbstractRemoteWritableBlobEntity<Cluste
     }
 
     @Override
-    public void set(final ClusterBlocks clusterBlocks) {
-        this.clusterBlocks = clusterBlocks;
-    }
-
-    @Override
-    public ClusterBlocks get() {
-        return clusterBlocks;
-    }
-
-
-    @Override
     public InputStream serialize() throws IOException {
         return CLUSTER_BLOCKS_FORMAT.serialize(clusterBlocks, generateBlobFileName(), getCompressor(), RemoteClusterStateUtils.FORMAT_PARAMS).streamInput();
     }
