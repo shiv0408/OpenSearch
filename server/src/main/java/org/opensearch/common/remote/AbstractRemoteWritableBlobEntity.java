@@ -8,12 +8,12 @@
 
 package org.opensearch.common.remote;
 
-import static org.opensearch.gateway.remote.RemoteClusterStateUtils.PATH_DELIMITER;
-
 import org.opensearch.common.blobstore.BlobPath;
 import org.opensearch.core.compress.Compressor;
 import org.opensearch.core.xcontent.NamedXContentRegistry;
 import org.opensearch.gateway.remote.ClusterMetadataManifest.UploadedMetadata;
+
+import static org.opensearch.gateway.remote.RemoteClusterStateUtils.PATH_DELIMITER;
 
 /**
  * An extension of {@link RemoteWriteableEntity} class which caters to the use case of writing to and reading from a blob storage
@@ -28,8 +28,13 @@ public abstract class AbstractRemoteWritableBlobEntity<T> implements RemoteWrite
     private final String clusterUUID;
     private final Compressor compressor;
     private final NamedXContentRegistry namedXContentRegistry;
+    private String[] pathTokens;
 
-    public AbstractRemoteWritableBlobEntity(final String clusterUUID, final Compressor compressor, final NamedXContentRegistry namedXContentRegistry) {
+    public AbstractRemoteWritableBlobEntity(
+        final String clusterUUID,
+        final Compressor compressor,
+        final NamedXContentRegistry namedXContentRegistry
+    ) {
         this.clusterUUID = clusterUUID;
         this.compressor = compressor;
         this.namedXContentRegistry = namedXContentRegistry;
@@ -43,16 +48,24 @@ public abstract class AbstractRemoteWritableBlobEntity<T> implements RemoteWrite
 
     public String getBlobFileName() {
         if (blobFileName == null) {
-            if (blobName == null) {
-                return null;
-            }
-            String[] pathTokens = blobName.split(PATH_DELIMITER);
-            if (pathTokens.length < 1) {
+            String[] pathTokens = getBlobPathTokens();
+            if (pathTokens == null || pathTokens.length < 1) {
                 return null;
             }
             blobFileName = pathTokens[pathTokens.length - 1];
         }
         return blobFileName;
+    }
+
+    public String[] getBlobPathTokens() {
+        if (pathTokens != null) {
+            return pathTokens;
+        }
+        if (blobName == null) {
+            return null;
+        }
+        pathTokens = blobName.split(PATH_DELIMITER);
+        return pathTokens;
     }
 
     public abstract String generateBlobFileName();
@@ -70,6 +83,7 @@ public abstract class AbstractRemoteWritableBlobEntity<T> implements RemoteWrite
     public NamedXContentRegistry getNamedXContentRegistry() {
         return namedXContentRegistry;
     }
+
     protected Compressor getCompressor() {
         return compressor;
     }

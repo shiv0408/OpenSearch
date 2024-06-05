@@ -8,8 +8,9 @@
 
 package org.opensearch.common.remote;
 
-import java.io.IOException;
 import org.opensearch.core.action.ActionListener;
+
+import java.io.IOException;
 
 /**
  * An interface to read/write an object from/to a remote storage. This interface is agnostic of the remote storage type.

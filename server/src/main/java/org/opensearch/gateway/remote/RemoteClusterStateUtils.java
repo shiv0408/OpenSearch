@@ -22,6 +22,9 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * Utility class for Remote Cluster State
+ */
 public class RemoteClusterStateUtils {
     public static final String METADATA_NAME_FORMAT = "%s.dat";
     public static final String METADATA_NAME_PLAIN_FORMAT = "%s";

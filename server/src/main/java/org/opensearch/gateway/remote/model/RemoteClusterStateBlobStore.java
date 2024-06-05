@@ -8,12 +8,6 @@
 
 package org.opensearch.gateway.remote.model;
 
-import static org.opensearch.gateway.remote.RemoteClusterStateUtils.PATH_DELIMITER;
-
-import java.io.IOException;
-import java.io.InputStream;
-import java.util.Arrays;
-import java.util.concurrent.ExecutorService;
 import org.opensearch.common.blobstore.BlobPath;
 import org.opensearch.common.blobstore.stream.write.WritePriority;
 import org.opensearch.common.remote.AbstractRemoteWritableBlobEntity;
@@ -24,6 +18,10 @@ import org.opensearch.gateway.remote.RemoteClusterStateUtils;
 import org.opensearch.index.translog.transfer.BlobStoreTransferService;
 import org.opensearch.repositories.blobstore.BlobStoreRepository;
 import org.opensearch.threadpool.ThreadPool;
+
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.concurrent.ExecutorService;
 
 /**
  * Abstract class for a blob type storage
@@ -38,8 +36,13 @@ public class RemoteClusterStateBlobStore<T, U extends AbstractRemoteWritableBlob
     private final String clusterName;
     private final ExecutorService executorService;
 
-    public RemoteClusterStateBlobStore(final BlobStoreTransferService blobStoreTransferService, final BlobStoreRepository blobStoreRepository, final String clusterName,
-        final ThreadPool threadPool, final String executor) {
+    public RemoteClusterStateBlobStore(
+        final BlobStoreTransferService blobStoreTransferService,
+        final BlobStoreRepository blobStoreRepository,
+        final String clusterName,
+        final ThreadPool threadPool,
+        final String executor
+    ) {
         this.transferService = blobStoreTransferService;
         this.blobStoreRepository = blobStoreRepository;
         this.clusterName = clusterName;
@@ -62,9 +65,9 @@ public class RemoteClusterStateBlobStore<T, U extends AbstractRemoteWritableBlob
 
     @Override
     public U read(final U entity) throws IOException {
-        assert entity.getFullBlobName() != null;
-        T object = entity.deserialize(
-            transferService.downloadBlob(getBlobPathForDownload(entity), entity.getBlobFileName()));
+        // TODO Add timing logs and tracing
+        assert entity.get() == null && entity.getFullBlobName() != null;
+        T object = entity.deserialize(transferService.downloadBlob(getBlobPathForDownload(entity), entity.getBlobFileName()));
         entity.set(object);
         return entity;
     }
@@ -81,7 +84,10 @@ public class RemoteClusterStateBlobStore<T, U extends AbstractRemoteWritableBlob
     }
 
     private BlobPath getBlobPathForUpload(final AbstractRemoteWritableBlobEntity<T> obj) {
-        BlobPath blobPath = blobStoreRepository.basePath().add(RemoteClusterStateUtils.encodeString(clusterName)).add("cluster-state").add(obj.clusterUUID());
+        BlobPath blobPath = blobStoreRepository.basePath()
+            .add(RemoteClusterStateUtils.encodeString(clusterName))
+            .add("cluster-state")
+            .add(obj.clusterUUID());
         for (String token : obj.getBlobPathParameters().getPathTokens()) {
             blobPath = blobPath.add(token);
         }
@@ -89,16 +95,16 @@ public class RemoteClusterStateBlobStore<T, U extends AbstractRemoteWritableBlob
     }
 
     private BlobPath getBlobPathForDownload(final AbstractRemoteWritableBlobEntity<T> obj) {
-        String[] pathTokens = extractBlobPathTokens(obj.getFullBlobName());
+        String[] pathTokens = obj.getBlobPathTokens();
         BlobPath blobPath = new BlobPath();
-        for (String token : pathTokens) {
-            blobPath = blobPath.add(token);
+        if (pathTokens == null || pathTokens.length < 1) {
+            return blobPath;
+        }
+        // Iterate till second last path token to get the blob folder
+        for (int i = 0; i < pathTokens.length - 1; i++) {
+            blobPath = blobPath.add(pathTokens[i]);
         }
         return blobPath;
     }
 
-    private static String[] extractBlobPathTokens(final String blobName) {
-        String[] blobNameTokens = blobName.split(PATH_DELIMITER);
-        return Arrays.copyOfRange(blobNameTokens, 0, blobNameTokens.length - 1);
-    }
 }
