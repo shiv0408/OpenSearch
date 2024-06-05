@@ -38,6 +38,12 @@ public class RemotePublishRequest extends TermVersionRequest {
         out.writeString(clusterUUID);
     }
 
+    @Override
+    public String toString() {
+        return "RemotePublishRequest{" + "term=" + term + ", version=" + version + ", clusterName=" + clusterName + ", clusterUUID=" + clusterUUID
+            + ", sourceNode=" + sourceNode + '}';
+    }
+
     public String getClusterName() {
         return clusterName;
     }
