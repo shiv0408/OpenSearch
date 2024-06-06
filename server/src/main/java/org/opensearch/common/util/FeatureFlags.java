@@ -56,10 +56,10 @@ public class FeatureFlags {
     public static final String DATETIME_FORMATTER_CACHING = "opensearch.experimental.optimization.datetime_formatter_caching.enabled";
 
     /**
-     * Gates the functionality of writeable remote index
+     * Gates the functionality of remote index having the capability to move across different tiers
      * Once the feature is ready for release, this feature flag can be removed.
      */
-    public static final String WRITEABLE_REMOTE_INDEX = "opensearch.experimental.feature.writeable_remote_index.enabled";
+    public static final String TIERED_REMOTE_INDEX = "opensearch.experimental.feature.tiered_remote_index.enabled";
 
     /**
      * Gates the functionality of pluggable cache.
@@ -70,7 +70,7 @@ public class FeatureFlags {
     /**
      * Gates the functionality of remote routing table.
      */
-    public static final String REMOTE_ROUTING_TABLE_EXPERIMENTAL = "opensearch.experimental.feature.remote_store.routing.enabled";
+    public static final String REMOTE_PUBLICATION_EXPERIMENTAL = "opensearch.experimental.feature.remote_store.publication.enabled";
 
     public static final Setting<Boolean> REMOTE_STORE_MIGRATION_EXPERIMENTAL_SETTING = Setting.boolSetting(
         REMOTE_STORE_MIGRATION_EXPERIMENTAL,
@@ -90,20 +90,15 @@ public class FeatureFlags {
         Property.NodeScope
     );
 
-    public static final Setting<Boolean> WRITEABLE_REMOTE_INDEX_SETTING = Setting.boolSetting(
-        WRITEABLE_REMOTE_INDEX,
-        false,
-        Property.NodeScope
-    );
+    public static final Setting<Boolean> TIERED_REMOTE_INDEX_SETTING = Setting.boolSetting(TIERED_REMOTE_INDEX, false, Property.NodeScope);
 
     public static final Setting<Boolean> PLUGGABLE_CACHE_SETTING = Setting.boolSetting(PLUGGABLE_CACHE, false, Property.NodeScope);
 
-    public static final Setting<Boolean> REMOTE_ROUTING_TABLE_EXPERIMENTAL_SETTING = Setting.boolSetting(
-        REMOTE_ROUTING_TABLE_EXPERIMENTAL,
-        true,
+    public static final Setting<Boolean> REMOTE_PUBLICATION_EXPERIMENTAL_SETTING = Setting.boolSetting(
+        REMOTE_PUBLICATION_EXPERIMENTAL,
+        false,
         Property.NodeScope
     );
-
 
     private static final List<Setting<Boolean>> ALL_FEATURE_FLAG_SETTINGS = List.of(
         REMOTE_STORE_MIGRATION_EXPERIMENTAL_SETTING,
@@ -111,9 +106,9 @@ public class FeatureFlags {
         IDENTITY_SETTING,
         TELEMETRY_SETTING,
         DATETIME_FORMATTER_CACHING_SETTING,
-        WRITEABLE_REMOTE_INDEX_SETTING,
+        TIERED_REMOTE_INDEX_SETTING,
         PLUGGABLE_CACHE_SETTING,
-        REMOTE_ROUTING_TABLE_EXPERIMENTAL_SETTING
+        REMOTE_PUBLICATION_EXPERIMENTAL_SETTING
     );
     /**
      * Should store the settings from opensearch.yml.

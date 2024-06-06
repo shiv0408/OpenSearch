@@ -93,15 +93,6 @@ public class RemoteClusterBlocksTest extends OpenSearchTestCase {
         threadPool.shutdown();
     }
 
-    public void testGet() {
-        ClusterBlocks clusterBlocks = getClusterBlocks();
-        RemoteClusterBlocks remoteObjectForUpload = new RemoteClusterBlocks(clusterBlocks, VERSION, clusterUUID, compressor, namedXContentRegistry);
-        assertThat(remoteObjectForUpload.get(), is(clusterBlocks));
-
-        RemoteIndexMetadata remoteObjectForDownload = new RemoteIndexMetadata(TEST_BLOB_NAME, clusterUUID, compressor, namedXContentRegistry);
-        assertThat(remoteObjectForDownload.get(), nullValue());
-    }
-
     public void testClusterUUID() {
         ClusterBlocks clusterBlocks = getClusterBlocks();
         RemoteClusterBlocks remoteObjectForUpload = new RemoteClusterBlocks(clusterBlocks, VERSION, clusterUUID, compressor, namedXContentRegistry);

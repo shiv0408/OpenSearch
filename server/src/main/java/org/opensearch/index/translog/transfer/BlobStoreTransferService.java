@@ -8,6 +8,9 @@
 
 package org.opensearch.index.translog.transfer;
 
+import java.io.ByteArrayOutputStream;
+import java.util.Base64;
+import java.util.HashMap;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.apache.logging.log4j.message.ParameterizedMessage;
@@ -19,7 +22,7 @@ import org.opensearch.common.blobstore.BlobContainer;
 import org.opensearch.common.blobstore.BlobMetadata;
 import org.opensearch.common.blobstore.BlobPath;
 import org.opensearch.common.blobstore.BlobStore;
-import org.opensearch.common.blobstore.FetchBlobResult;
+import org.opensearch.common.blobstore.InputStreamWithMetadata;
 import org.opensearch.common.blobstore.stream.write.WritePriority;
 import org.opensearch.common.blobstore.transfer.RemoteTransferContainer;
 import org.opensearch.common.blobstore.transfer.stream.OffsetRangeFileInputStream;
@@ -41,6 +44,7 @@ import java.util.Objects;
 import java.util.Set;
 
 import static org.opensearch.common.blobstore.BlobContainer.BlobNameSortOrder.LEXICOGRAPHIC;
+import static org.opensearch.index.translog.transfer.TranslogTransferManager.CHECKPOINT_FILE_DATA_KEY;
 import static org.opensearch.common.blobstore.transfer.RemoteTransferContainer.checksumOfChecksum;
 
 /**
@@ -140,9 +144,34 @@ public class BlobStoreTransferService implements TransferService {
                 writePriority,
                 (size, position) -> new OffsetRangeIndexInputStream(input, size, position),
                 expectedChecksum,
-                listener
+                listener,
+                null
             );
         }
+    }
+
+    // Builds a metadata map containing the Base64-encoded checkpoint file data associated with a translog file.
+    static Map<String, String> buildTransferFileMetadata(InputStream metadataInputStream) throws IOException {
+        Map<String, String> metadata = new HashMap<>();
+        try (ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream()) {
+            byte[] buffer = new byte[128];
+            int bytesRead;
+            int totalBytesRead = 0;
+
+            while ((bytesRead = metadataInputStream.read(buffer)) != -1) {
+                byteArrayOutputStream.write(buffer, 0, bytesRead);
+                totalBytesRead += bytesRead;
+                if (totalBytesRead > 1024) {
+                    // We enforce a limit of 1KB on the size of the checkpoint file.
+                    throw new IOException("Input stream exceeds 1KB limit");
+                }
+            }
+
+            byte[] bytes = byteArrayOutputStream.toByteArray();
+            String metadataString = Base64.getEncoder().encodeToString(bytes);
+            metadata.put(CHECKPOINT_FILE_DATA_KEY, metadataString);
+        }
+        return metadata;
     }
 
     private void uploadBlob(
@@ -154,6 +183,11 @@ public class BlobStoreTransferService implements TransferService {
 
         try {
             ChannelFactory channelFactory = FileChannel::open;
+            Map<String, String> metadata = null;
+            if (fileSnapshot.getMetadataFileInputStream() != null) {
+                metadata = buildTransferFileMetadata(fileSnapshot.getMetadataFileInputStream());
+            }
+
             long contentLength;
             try (FileChannel channel = channelFactory.open(fileSnapshot.getPath(), StandardOpenOption.READ)) {
                 contentLength = channel.size();
@@ -171,7 +205,8 @@ public class BlobStoreTransferService implements TransferService {
                 writePriority,
                 (size, position) -> new OffsetRangeFileInputStream(fileSnapshot.getPath(), size, position),
                 fileSnapshot.getChecksum(),
-                completionListener
+                completionListener,
+                metadata
             );
 
         } catch (Exception e) {
@@ -187,7 +222,7 @@ public class BlobStoreTransferService implements TransferService {
 
     }
 
-    private void asyncBlobUpload(String fileName, String remoteFileName, long contentLength, BlobPath blobPath, WritePriority writePriority, RemoteTransferContainer.OffsetRangeInputStreamSupplier inputStreamSupplier, long expectedChecksum, ActionListener<Void> completionListener) throws IOException {
+    private void asyncBlobUpload(String fileName, String remoteFileName, long contentLength, BlobPath blobPath, WritePriority writePriority, RemoteTransferContainer.OffsetRangeInputStreamSupplier inputStreamSupplier, long expectedChecksum, ActionListener<Void> completionListener, Map<String, String> metadata) throws IOException {
         BlobContainer blobContainer = blobStore.blobContainer(blobPath);
         assert blobContainer instanceof AsyncMultiStreamBlobContainer;
         boolean remoteIntegrityEnabled = ((AsyncMultiStreamBlobContainer) blobContainer).remoteIntegrityCheckSupported();
@@ -199,7 +234,8 @@ public class BlobStoreTransferService implements TransferService {
             writePriority,
             inputStreamSupplier,
             expectedChecksum,
-            remoteIntegrityEnabled
+            remoteIntegrityEnabled,
+            metadata
         )) {
             ((AsyncMultiStreamBlobContainer) blobContainer).asyncBlobUpload(remoteTransferContainer.createWriteContext(), completionListener);
         }
@@ -212,7 +248,8 @@ public class BlobStoreTransferService implements TransferService {
 
     @Override
     @ExperimentalApi
-    public FetchBlobResult downloadBlobWithMetadata(Iterable<String> path, String fileName) throws IOException {
+    public InputStreamWithMetadata downloadBlobWithMetadata(Iterable<String> path, String fileName) throws IOException {
+        assert blobStore.isBlobMetadataEnabled();
         return blobStore.blobContainer((BlobPath) path).readBlobWithMetadata(fileName);
     }
 

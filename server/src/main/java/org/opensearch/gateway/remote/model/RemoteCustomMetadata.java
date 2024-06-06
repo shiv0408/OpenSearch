@@ -36,12 +36,6 @@ public class RemoteCustomMetadata extends AbstractRemoteWritableBlobEntity<Custo
 
     public static final String CUSTOM_METADATA = "custom";
     public static final String CUSTOM_DELIMITER = "--";
-    public static final ChecksumBlobStoreFormat<Metadata.Custom> CUSTOM_METADATA_FORMAT = new ChecksumBlobStoreFormat<>(
-        "custom",
-        METADATA_NAME_FORMAT,
-        Metadata.Custom::fromXContent
-    );
-
     public final ChecksumBlobStoreFormat<Custom> customBlobStoreFormat;
 
     private Custom custom;

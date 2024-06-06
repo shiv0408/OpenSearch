@@ -24,6 +24,7 @@ import org.opensearch.common.blobstore.BlobPath;
 import org.opensearch.common.blobstore.stream.write.WritePriority;
 import org.opensearch.common.blobstore.transfer.RemoteTransferContainer;
 import org.opensearch.common.blobstore.transfer.stream.OffsetRangeIndexInputStream;
+import org.opensearch.common.lifecycle.AbstractLifecycleComponent;
 
 import org.opensearch.common.lucene.store.ByteArrayIndexInput;
 import org.opensearch.common.settings.Setting;
@@ -70,7 +71,7 @@ import static org.opensearch.node.remotestore.RemoteStoreNodeAttribute.isRemoteR
  *
  * @opensearch.internal
  */
-public class RemoteRoutingTableService implements Closeable {
+public class RemoteRoutingTableService extends AbstractLifecycleComponent {
 
     /**
      * Cluster setting to specify if routing table should be published to remote store
@@ -289,21 +290,25 @@ public class RemoteRoutingTableService implements Closeable {
 
 
     @Override
-    public void close() throws IOException {
+    public void doClose() throws IOException {
         if (blobStoreRepository != null) {
             IOUtils.close(blobStoreRepository);
         }
     }
 
-    public void start() {
+    @Override
+    protected void doStart() {
         assert isRemoteRoutingTableEnabled(settings) == true : "Remote routing table is not enabled";
         final String remoteStoreRepo = settings.get(
-            Node.NODE_ATTRIBUTES.getKey() + RemoteStoreNodeAttribute.REMOTE_STORE_CLUSTER_STATE_REPOSITORY_NAME_ATTRIBUTE_KEY
+            Node.NODE_ATTRIBUTES.getKey() + RemoteStoreNodeAttribute.REMOTE_STORE_ROUTING_TABLE_REPOSITORY_NAME_ATTRIBUTE_KEY
         );
         assert remoteStoreRepo != null : "Remote routing table repository is not configured";
         final Repository repository = repositoriesService.get().repository(remoteStoreRepo);
         assert repository instanceof BlobStoreRepository : "Repository should be instance of BlobStoreRepository";
         blobStoreRepository = (BlobStoreRepository) repository;
     }
+
+    @Override
+    protected void doStop() {}
 
 }

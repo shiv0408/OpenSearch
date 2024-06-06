@@ -30,7 +30,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-import static org.opensearch.common.util.FeatureFlags.REMOTE_ROUTING_TABLE_EXPERIMENTAL;
+import static org.opensearch.common.util.FeatureFlags.REMOTE_PUBLICATION_EXPERIMENTAL;
 
 /**
  * This is an abstraction for validating and storing information specific to remote backed storage nodes.
@@ -50,7 +50,7 @@ public class RemoteStoreNodeAttribute {
         + "."
         + CryptoMetadata.SETTINGS_KEY;
     public static final String REMOTE_STORE_REPOSITORY_SETTINGS_ATTRIBUTE_KEY_PREFIX = "remote_store.repository.%s.settings.";
-    public static final String REMOTE_STORE_ROUTING_TABLE_REPOSITORY_NAME_ATTRIBUTE_KEY = "remote_store.routing.repository";
+    public static final String REMOTE_STORE_ROUTING_TABLE_REPOSITORY_NAME_ATTRIBUTE_KEY = "remote_store.routing_table.repository";
 
     private final RepositoriesMetadata repositoriesMetadata;
 
@@ -115,11 +115,11 @@ public class RemoteStoreNodeAttribute {
             .filter(key -> key.startsWith(settingsAttributeKeyPrefix))
             .collect(Collectors.toMap(key -> key.replace(settingsAttributeKeyPrefix, ""), key -> validateAttributeNonNull(node, key)));
 
-//        if (settingsMap.isEmpty()) {
-//            throw new IllegalStateException(
-//                "joining node [" + node + "] doesn't have settings attribute for [" + repositoryName + "] repository"
-//            );
-//        }
+        if (settingsMap.isEmpty()) {
+            throw new IllegalStateException(
+                "joining node [" + node + "] doesn't have settings attribute for [" + repositoryName + "] repository"
+            );
+        }
 
         return settingsMap;
     }
@@ -163,7 +163,7 @@ public class RemoteStoreNodeAttribute {
         } else if (node.getAttributes().containsKey(REMOTE_STORE_CLUSTER_STATE_REPOSITORY_NAME_ATTRIBUTE_KEY)) {
             repositoryNames.add(validateAttributeNonNull(node, REMOTE_STORE_CLUSTER_STATE_REPOSITORY_NAME_ATTRIBUTE_KEY));
         }
-        if (node.getAttributes().containsKey(REMOTE_STORE_ROUTING_TABLE_REPOSITORY_NAME_ATTRIBUTE_KEY)){
+        if (node.getAttributes().containsKey(REMOTE_STORE_ROUTING_TABLE_REPOSITORY_NAME_ATTRIBUTE_KEY)) {
             repositoryNames.add(validateAttributeNonNull(node, REMOTE_STORE_ROUTING_TABLE_REPOSITORY_NAME_ATTRIBUTE_KEY));
         }
 
@@ -197,17 +197,13 @@ public class RemoteStoreNodeAttribute {
             && isRemoteClusterStateAttributePresent(settings);
     }
 
-    public static boolean isRemoteRoutingTableAttributePresent(Settings settings) {
+    private static boolean isRemoteRoutingTableAttributePresent(Settings settings) {
         return settings.getByPrefix(Node.NODE_ATTRIBUTES.getKey() + REMOTE_STORE_ROUTING_TABLE_REPOSITORY_NAME_ATTRIBUTE_KEY)
             .isEmpty() == false;
     }
 
     public static boolean isRemoteRoutingTableEnabled(Settings settings) {
-        assert FeatureFlags.isEnabled(REMOTE_ROUTING_TABLE_EXPERIMENTAL) == true;
-        assert RemoteRoutingTableService.REMOTE_ROUTING_TABLE_ENABLED_SETTING.get(settings) == true;
-        assert isRemoteRoutingTableAttributePresent(settings) == true;
-        return FeatureFlags.isEnabled(REMOTE_ROUTING_TABLE_EXPERIMENTAL) && RemoteRoutingTableService.REMOTE_ROUTING_TABLE_ENABLED_SETTING.get(settings)
-            && isRemoteRoutingTableAttributePresent(settings);
+        return FeatureFlags.isEnabled(REMOTE_PUBLICATION_EXPERIMENTAL) && isRemoteRoutingTableAttributePresent(settings);
     }
 
     public RepositoriesMetadata getRepositoriesMetadata() {
@@ -252,6 +248,21 @@ public class RemoteStoreNodeAttribute {
                 : Objects.hash(repositoryMetadata.name(), repositoryMetadata.type(), repositoryMetadata.settings()));
         }
         return hashCode;
+    }
+
+    /**
+     * Checks if 2 instances are equal, with option to skip check for a list of repos.
+     * *
+     * @param o other instance
+     * @param reposToSkip list of repos to skip check for equality
+     * @return {@code true} iff both instances are equal, not including the repositories in both instances if they are part of reposToSkip.
+     */
+    public boolean equalsWithRepoSkip(Object o, List<String> reposToSkip) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+
+        RemoteStoreNodeAttribute that = (RemoteStoreNodeAttribute) o;
+        return this.getRepositoriesMetadata().equalsIgnoreGenerationsWithRepoSkip(that.getRepositoriesMetadata(), reposToSkip);
     }
 
     @Override

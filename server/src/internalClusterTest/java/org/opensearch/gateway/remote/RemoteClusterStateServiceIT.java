@@ -17,6 +17,7 @@ import org.opensearch.remotestore.RemoteStoreBaseIntegTestCase;
 import org.opensearch.repositories.RepositoriesService;
 import org.opensearch.repositories.blobstore.BlobStoreRepository;
 import org.opensearch.test.OpenSearchIntegTestCase;
+import org.junit.Before;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -38,6 +39,11 @@ import static org.opensearch.gateway.remote.model.RemoteTemplatesMetadata.TEMPLA
 public class RemoteClusterStateServiceIT extends RemoteStoreBaseIntegTestCase {
 
     private static String INDEX_NAME = "test-index";
+
+    @Before
+    public void setup() {
+        asyncUploadMockFsRepo = false;
+    }
 
     @Override
     protected Settings nodeSettings(int nodeOrdinal) {

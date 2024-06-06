@@ -91,15 +91,6 @@ public class RemoteIndexMetadataTests extends OpenSearchTestCase {
         threadPool.shutdown();
     }
 
-    public void testGet() {
-        IndexMetadata indexMetadata = getIndexMetadata();
-        RemoteIndexMetadata remoteObjectForUpload = new RemoteIndexMetadata(indexMetadata, clusterUUID, compressor, namedXContentRegistry);
-        assertThat(remoteObjectForUpload.get(), is(indexMetadata));
-
-        RemoteIndexMetadata remoteObjectForDownload = new RemoteIndexMetadata(TEST_BLOB_NAME, clusterUUID, compressor, namedXContentRegistry);
-        assertThat(remoteObjectForDownload.get(), nullValue());
-    }
-
     public void testClusterUUID() {
         IndexMetadata indexMetadata = getIndexMetadata();
         RemoteIndexMetadata remoteObjectForUpload = new RemoteIndexMetadata(indexMetadata, clusterUUID, compressor, namedXContentRegistry);

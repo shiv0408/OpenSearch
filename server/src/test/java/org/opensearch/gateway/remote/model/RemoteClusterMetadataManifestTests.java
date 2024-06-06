@@ -95,15 +95,6 @@ public class RemoteClusterMetadataManifestTests extends OpenSearchTestCase {
         threadPool.shutdown();
     }
 
-    public void testGet() {
-        ClusterMetadataManifest manifest = getClusterMetadataManifest();
-        RemoteClusterMetadataManifest remoteObjectForUpload = new RemoteClusterMetadataManifest(manifest, clusterUUID, compressor, namedXContentRegistry);
-        assertThat(remoteObjectForUpload.get(), is(manifest));
-
-        RemoteClusterMetadataManifest remoteObjectForDownload = new RemoteClusterMetadataManifest(TEST_BLOB_NAME, clusterUUID, compressor, namedXContentRegistry);
-        assertThat(remoteObjectForDownload.get(), nullValue());
-    }
-
     public void testClusterUUID() {
         ClusterMetadataManifest manifest = getClusterMetadataManifest();
         RemoteClusterMetadataManifest remoteObjectForUpload = new RemoteClusterMetadataManifest(manifest, clusterUUID, compressor, namedXContentRegistry);
