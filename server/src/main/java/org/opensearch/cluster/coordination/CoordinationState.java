@@ -50,6 +50,7 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import org.opensearch.node.remotestore.RemoteStoreNodeAttribute;
 
 import static org.opensearch.cluster.coordination.Coordinator.ZEN1_BWC_TERM;
 import static org.opensearch.node.remotestore.RemoteStoreNodeAttribute.isRemoteStoreClusterStateEnabled;
@@ -79,6 +80,7 @@ public class CoordinationState {
     private VotingConfiguration lastPublishedConfiguration;
     private VoteCollection publishVotes;
     private final boolean isRemoteStateEnabled;
+    private final boolean isRemotePublicationEnabled;
 
     public CoordinationState(
         DiscoveryNode localNode,
@@ -102,10 +104,15 @@ public class CoordinationState {
             .getLastAcceptedConfiguration();
         this.publishVotes = new VoteCollection();
         this.isRemoteStateEnabled = isRemoteStoreClusterStateEnabled(settings);
+        this.isRemotePublicationEnabled = RemoteStoreNodeAttribute.isRemotePublicationEnabled(settings);
     }
 
     public boolean isRemoteStateEnabled() {
         return isRemoteStateEnabled;
+    }
+
+    public boolean isRemotePublicationEnabled() {
+        return isRemotePublicationEnabled;
     }
 
     public long getCurrentTerm() {
@@ -453,7 +460,6 @@ public class CoordinationState {
             clusterState.version(),
             clusterState.term()
         );
-        logger.info("Setting last accepted state : term - {}, version - {}", clusterState.term(), clusterState.version());
         persistedStateRegistry.getPersistedState(PersistedStateType.LOCAL).setLastAcceptedState(clusterState);
         assert getLastAcceptedState() == clusterState;
 

@@ -242,27 +242,27 @@ public class PublicationTransportHandler {
         boolean applyFullState = false;
         final ClusterState lastSeen = lastSeenClusterState.get();
         if (lastSeen == null) {
-            logger.debug("Diff cannot be applied as there is no last cluster state");
+            logger.debug(() -> "Diff cannot be applied as there is no last cluster state");
             applyFullState = true;
         } else if (manifest.getDiffManifest() == null) {
-            logger.debug("There is no diff in the manifest");
+            logger.trace(() -> "There is no diff in the manifest");
             applyFullState = true;
         } else if (manifest.getDiffManifest().getFromStateUUID().equals(lastSeen.stateUUID()) == false) {
-            logger.debug("Last cluster state not compatible with the diff");
+            logger.debug(() -> "Last cluster state not compatible with the diff");
             applyFullState = true;
         }
 
         if (applyFullState == true) {
-            logger.info("Downloading full cluster state for term {}, version {}, stateUUID {}", manifest.getClusterTerm(), manifest.getStateVersion(),
-                manifest.getStateUUID());
+            logger.info(() -> new ParameterizedMessage("Downloading full cluster state for term {}, version {}, stateUUID {}", manifest.getClusterTerm(), manifest.getStateVersion(),
+                manifest.getStateUUID()));
             ClusterState clusterState = remoteClusterStateService.getClusterStateForManifest(request.getClusterName(), manifest, transportService.getLocalNode().getId(), true);
             fullClusterStateReceivedCount.incrementAndGet();
             final PublishWithJoinResponse response = acceptState(clusterState);
             lastSeenClusterState.set(clusterState);
             return response;
         } else {
-            logger.info("Downloading diff cluster state for term {}, version {}, previousUUID {}, current UUID {}", manifest.getClusterTerm(),
-                manifest.getStateVersion(), manifest.getDiffManifest().getFromStateUUID(), manifest.getStateUUID());
+            logger.info(() -> new ParameterizedMessage("Downloading diff cluster state for term {}, version {}, previousUUID {}, current UUID {}", manifest.getClusterTerm(),
+                manifest.getStateVersion(), manifest.getDiffManifest().getFromStateUUID(), manifest.getStateUUID()));
             ClusterState clusterState = remoteClusterStateService.getClusterStateUsingDiff(request.getClusterName(), manifest, lastSeen, transportService.getLocalNode().getId());
             compatibleClusterStateDiffReceivedCount.incrementAndGet();
             final PublishWithJoinResponse response = acceptState(clusterState);
@@ -285,7 +285,6 @@ public class PublicationTransportHandler {
     }
 
     private PublishWithJoinResponse acceptStateOnLocalNode(RemotePublishRequest remotePublishRequest) {
-        // if the state is coming from the current node, use original request instead (see currentPublishRequestToSelf for explanation)
         final PublishRequest publishRequest = currentPublishRequestToSelf.get();
         if (publishRequest == null || publishRequest.getAcceptedState().coordinationMetadata().term() != remotePublishRequest.term
             || publishRequest.getAcceptedState().version() != remotePublishRequest.version) {
@@ -296,8 +295,8 @@ public class PublicationTransportHandler {
         return publishWithJoinResponse;
     }
 
-    public PublicationContext newPublicationContext(ClusterChangedEvent clusterChangedEvent, boolean isRemoteStateEnabled) {
-        final PublicationContext publicationContext = new PublicationContext(clusterChangedEvent, isRemoteStateEnabled);
+    public PublicationContext newPublicationContext(ClusterChangedEvent clusterChangedEvent, boolean isRemotePublicationEnabled) {
+        final PublicationContext publicationContext = new PublicationContext(clusterChangedEvent, isRemotePublicationEnabled);
 
         // Build the serializations we expect to need now, early in the process, so that an error during serialization fails the publication
         // straight away. This isn't watertight since we send diffs on a best-effort basis and may fall back to sending a full state (and
@@ -344,12 +343,12 @@ public class PublicationTransportHandler {
         private final Map<Version, BytesReference> serializedDiffs = new HashMap<>();
         private final boolean sendRemoteState;
 
-        PublicationContext(ClusterChangedEvent clusterChangedEvent, boolean isRemoteStateEnabled) {
+        PublicationContext(ClusterChangedEvent clusterChangedEvent, boolean isRemotePublicationEnabled) {
             discoveryNodes = clusterChangedEvent.state().nodes();
             newState = clusterChangedEvent.state();
             previousState = clusterChangedEvent.previousState();
             sendFullVersion = previousState.getBlocks().disableStatePersistence();
-            sendRemoteState = isRemoteStateEnabled;
+            sendRemoteState = isRemotePublicationEnabled;
         }
 
         void buildDiffAndSerializeStates() {
@@ -413,7 +412,7 @@ public class PublicationTransportHandler {
             } else {
                 responseActionListener = listener;
             }
-            if (sendRemoteState && destination.isRemoteStateNode()) {
+            if (sendRemoteState && destination.isRemoteClusterStateEnabled() && destination.isRemoteRoutingTableEnabled()) {
                 sendRemoteClusterState(destination, publishRequest.getAcceptedState(), responseActionListener);
             } else if (sendFullVersion || previousState.nodes().nodeExists(destination) == false) {
                 logger.trace("sending full cluster state version [{}] to [{}]", newState.version(), destination);

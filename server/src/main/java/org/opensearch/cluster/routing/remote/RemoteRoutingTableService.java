@@ -13,7 +13,6 @@ import org.apache.logging.log4j.Logger;
 import org.apache.lucene.store.IndexInput;
 import org.opensearch.action.LatchedActionListener;
 import org.opensearch.cluster.ClusterState;
-import org.opensearch.cluster.Diff;
 import org.opensearch.cluster.DiffableUtils;
 import org.opensearch.cluster.routing.IndexRoutingTable;
 import org.opensearch.cluster.routing.RoutingTable;
@@ -48,7 +47,6 @@ import org.opensearch.repositories.Repository;
 import org.opensearch.repositories.blobstore.BlobStoreRepository;
 import org.opensearch.threadpool.ThreadPool;
 
-import java.io.Closeable;
 import java.io.IOException;
 
 import java.io.InputStream;
@@ -62,9 +60,8 @@ import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
-import static org.opensearch.common.blobstore.transfer.RemoteTransferContainer.checksumOfChecksum;
 import static org.opensearch.gateway.remote.RemoteClusterStateUtils.getCusterMetadataBasePath;
-import static org.opensearch.node.remotestore.RemoteStoreNodeAttribute.isRemoteRoutingTableEnabled;
+import static org.opensearch.node.remotestore.RemoteStoreNodeAttribute.isRemotePublicationEnabled;
 
 /**
  * A Service which provides APIs to upload and download routing table from remote store.
@@ -109,7 +106,7 @@ public class RemoteRoutingTableService extends AbstractLifecycleComponent {
     public RemoteRoutingTableService(Supplier<RepositoriesService> repositoriesService,
                                      Settings settings,
                                      ThreadPool threadPool) {
-        assert isRemoteRoutingTableEnabled(settings) : "Remote routing table is not enabled";
+        assert isRemotePublicationEnabled(settings) : "Remote routing table is not enabled";
         this.repositoriesService = repositoriesService;
         this.settings = settings;
         this.threadPool = threadPool;
@@ -301,7 +298,7 @@ public class RemoteRoutingTableService extends AbstractLifecycleComponent {
 
     @Override
     protected void doStart() {
-        assert isRemoteRoutingTableEnabled(settings) == true : "Remote routing table is not enabled";
+        assert isRemotePublicationEnabled(settings) == true : "Remote routing table is not enabled";
         final String remoteStoreRepo = settings.get(
             Node.NODE_ATTRIBUTES.getKey() + RemoteStoreNodeAttribute.REMOTE_STORE_ROUTING_TABLE_REPOSITORY_NAME_ATTRIBUTE_KEY
         );
