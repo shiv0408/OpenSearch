@@ -65,6 +65,7 @@ public interface TransferService {
      * @throws IOException the exception while transferring the data
      */
     void uploadBlob(final TransferFileSnapshot fileSnapshot, Iterable<String> remotePath, WritePriority writePriority) throws IOException;
+    void uploadBlobAsync(InputStream inputStream, Iterable<String> remotePath, String blobName, WritePriority writePriority, ActionListener<Void> listener) throws IOException;
 
     void deleteBlobs(Iterable<String> path, List<String> fileNames) throws IOException;
 

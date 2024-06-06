@@ -77,6 +77,7 @@ import org.opensearch.cluster.routing.allocation.decider.NodeLoadAwareAllocation
 import org.opensearch.cluster.routing.allocation.decider.SameShardAllocationDecider;
 import org.opensearch.cluster.routing.allocation.decider.ShardsLimitAllocationDecider;
 import org.opensearch.cluster.routing.allocation.decider.ThrottlingAllocationDecider;
+import org.opensearch.cluster.routing.remote.RemoteRoutingTableService;
 import org.opensearch.cluster.service.ClusterApplierService;
 import org.opensearch.cluster.service.ClusterManagerService;
 import org.opensearch.cluster.service.ClusterManagerTaskThrottler;
@@ -104,7 +105,11 @@ import org.opensearch.gateway.DanglingIndicesState;
 import org.opensearch.gateway.GatewayService;
 import org.opensearch.gateway.PersistedClusterStateService;
 import org.opensearch.gateway.ShardsBatchGatewayAllocator;
+import org.opensearch.gateway.remote.RemoteClusterStateCleanupManager;
 import org.opensearch.gateway.remote.RemoteClusterStateService;
+import org.opensearch.gateway.remote.RemoteGlobalMetadataManager;
+import org.opensearch.gateway.remote.RemoteIndexMetadataManager;
+import org.opensearch.gateway.remote.RemoteManifestManager;
 import org.opensearch.http.HttpTransportSettings;
 import org.opensearch.index.IndexModule;
 import org.opensearch.index.IndexSettings;
@@ -711,10 +716,13 @@ public final class ClusterSettings extends AbstractScopedSettings {
                 SearchRequestSlowLog.CLUSTER_SEARCH_REQUEST_SLOWLOG_LEVEL,
 
                 // Remote cluster state settings
+                RemoteClusterStateCleanupManager.REMOTE_CLUSTER_STATE_CLEANUP_INTERVAL_SETTING,
                 RemoteClusterStateService.REMOTE_CLUSTER_STATE_ENABLED_SETTING,
-                RemoteClusterStateService.INDEX_METADATA_UPLOAD_TIMEOUT_SETTING,
-                RemoteClusterStateService.GLOBAL_METADATA_UPLOAD_TIMEOUT_SETTING,
-                RemoteClusterStateService.METADATA_MANIFEST_UPLOAD_TIMEOUT_SETTING,
+                RemoteClusterStateService.REMOTE_STATE_READ_TIMEOUT_SETTING,
+                RemoteClusterStateService.REMOTE_STATE_READ_TIMEOUT_SETTING,
+                RemoteIndexMetadataManager.INDEX_METADATA_UPLOAD_TIMEOUT_SETTING,
+                RemoteGlobalMetadataManager.GLOBAL_METADATA_UPLOAD_TIMEOUT_SETTING,
+                RemoteManifestManager.METADATA_MANIFEST_UPLOAD_TIMEOUT_SETTING,
                 RemoteStoreNodeService.REMOTE_STORE_COMPATIBILITY_MODE_SETTING,
                 RemoteStoreNodeService.MIGRATION_DIRECTION_SETTING,
                 IndicesService.CLUSTER_REMOTE_INDEX_RESTRICT_ASYNC_DURABILITY_SETTING,
@@ -741,7 +749,10 @@ public final class ClusterSettings extends AbstractScopedSettings {
                 RemoteStoreSettings.CLUSTER_REMOTE_STORE_PATH_TYPE_SETTING,
                 RemoteStoreSettings.CLUSTER_REMOTE_STORE_PATH_HASH_ALGORITHM_SETTING,
                 RemoteStoreSettings.CLUSTER_REMOTE_MAX_TRANSLOG_READERS,
-                RemoteStoreSettings.CLUSTER_REMOTE_STORE_TRANSLOG_METADATA
+                RemoteStoreSettings.CLUSTER_REMOTE_STORE_TRANSLOG_METADATA,
+
+                // Remote Routing table settings
+                RemoteRoutingTableService.REMOTE_ROUTING_TABLE_ENABLED_SETTING
             )
         )
     );

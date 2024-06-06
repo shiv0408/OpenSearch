@@ -61,6 +61,7 @@ import org.opensearch.core.common.io.stream.StreamOutput;
 import org.opensearch.core.common.io.stream.VersionedNamedWriteable;
 import org.opensearch.core.xcontent.ToXContentFragment;
 import org.opensearch.core.xcontent.XContentBuilder;
+import org.opensearch.core.xcontent.XContentParser;
 import org.opensearch.discovery.Discovery;
 
 import java.io.IOException;
@@ -154,6 +155,9 @@ public class ClusterState implements ToXContentFragment, Diffable<ClusterState> 
             return false;
         }
 
+        static Custom fromXContent(XContentParser parser, String name) throws IOException {
+            return parser.namedObject(Custom.class, name, null);
+        }
     }
 
     private static final NamedDiffableValueSerializer<Custom> CUSTOM_VALUE_SERIALIZER = new NamedDiffableValueSerializer<>(Custom.class);
@@ -496,38 +500,12 @@ public class ClusterState implements ToXContentFragment, Diffable<ClusterState> 
         }
 
         if (metrics.contains(Metric.BLOCKS)) {
-            builder.startObject("blocks");
-
-            if (blocks().global().isEmpty() == false) {
-                builder.startObject("global");
-                for (ClusterBlock block : blocks().global()) {
-                    block.toXContent(builder, params);
-                }
-                builder.endObject();
-            }
-
-            if (blocks().indices().isEmpty() == false) {
-                builder.startObject("indices");
-                for (final Map.Entry<String, Set<ClusterBlock>> entry : blocks().indices().entrySet()) {
-                    builder.startObject(entry.getKey());
-                    for (ClusterBlock block : entry.getValue()) {
-                        block.toXContent(builder, params);
-                    }
-                    builder.endObject();
-                }
-                builder.endObject();
-            }
-
-            builder.endObject();
+            blocks().toXContent(builder, params);
         }
 
         // nodes
         if (metrics.contains(Metric.NODES)) {
-            builder.startObject("nodes");
-            for (DiscoveryNode node : nodes) {
-                node.toXContent(builder, params);
-            }
-            builder.endObject();
+            nodes.toXContent(builder, params);
         }
 
         // meta data

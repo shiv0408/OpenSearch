@@ -1183,7 +1183,8 @@ public class AbstractCoordinatorTestCase extends OpenSearchTestCase {
                     getElectionStrategy(),
                     nodeHealthService,
                     persistedStateRegistry,
-                    remoteStoreNodeService
+                    remoteStoreNodeService,
+                    null
                 );
                 clusterManagerService.setClusterStatePublisher(coordinator);
                 final GatewayService gatewayService = new GatewayService(

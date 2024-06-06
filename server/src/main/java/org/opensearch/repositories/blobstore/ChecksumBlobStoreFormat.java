@@ -31,6 +31,13 @@
 
 package org.opensearch.repositories.blobstore;
 
+import static org.opensearch.common.blobstore.transfer.RemoteTransferContainer.checksumOfChecksum;
+
+import java.io.IOException;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.Locale;
+import java.util.Map;
 import org.apache.lucene.codecs.CodecUtil;
 import org.apache.lucene.index.CorruptIndexException;
 import org.apache.lucene.index.IndexFormatTooNewException;
@@ -60,14 +67,6 @@ import org.opensearch.core.xcontent.XContentParser;
 import org.opensearch.gateway.CorruptStateException;
 import org.opensearch.index.store.exception.ChecksumCombinationException;
 import org.opensearch.snapshots.SnapshotInfo;
-
-import java.io.IOException;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.Locale;
-import java.util.Map;
-
-import static org.opensearch.common.blobstore.transfer.RemoteTransferContainer.checksumOfChecksum;
 
 /**
  * Snapshot metadata file format used in v2.0 and above
@@ -114,8 +113,7 @@ public final class ChecksumBlobStoreFormat<T extends ToXContent> extends BaseBlo
      * @param name          name to be translated into
      * @return parsed blob object
      */
-    public T read(BlobContainer blobContainer, String name, NamedXContentRegistry namedXContentRegistry) throws IOException {
-        String blobName = blobName(name);
+    public T read(BlobContainer blobContainer, String name, NamedXContentRegistry namedXContentRegistry) throws IOException {String blobName = blobName(name);
         return deserialize(blobName, namedXContentRegistry, Streams.readFully(blobContainer.readBlob(blobName)));
     }
 
