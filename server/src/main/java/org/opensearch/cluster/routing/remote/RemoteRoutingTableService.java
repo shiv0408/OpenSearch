@@ -171,12 +171,13 @@ public class RemoteRoutingTableService extends AbstractLifecycleComponent {
                 try (
             InputStream indexRoutingStream = new IndexRoutingTableInputStream(indexRouting);
             IndexInput input = new ByteArrayIndexInput("indexrouting", indexRoutingStream.readAllBytes())) {
-            long expectedChecksum;
-            try {
-                expectedChecksum = checksumOfChecksum(input.clone(), 8);
-            } catch (Exception e) {
-                throw e;
-            }
+                    //todo reenable checksum
+//            long expectedChecksum;
+//            try {
+//                expectedChecksum = checksumOfChecksum(input.clone(), 8);
+//            } catch (Exception e) {
+//                throw e;
+//            }
             try (
                 RemoteTransferContainer remoteTransferContainer = new RemoteTransferContainer(
                     fileName,
@@ -185,8 +186,10 @@ public class RemoteRoutingTableService extends AbstractLifecycleComponent {
                     true,
                     WritePriority.URGENT,
                     (size, position) -> new OffsetRangeIndexInputStream(input, size, position),
-                    expectedChecksum,
-                    ((AsyncMultiStreamBlobContainer) blobContainer).remoteIntegrityCheckSupported()
+//                    expectedChecksum,
+//                    ((AsyncMultiStreamBlobContainer) blobContainer).remoteIntegrityCheckSupported()
+                    null,
+                    false
                 )
             ) {
                 return () -> ((AsyncMultiStreamBlobContainer) blobContainer).asyncBlobUpload(remoteTransferContainer.createWriteContext(), completionListener);
