@@ -32,6 +32,7 @@ public class RemoteClusterStateUtils {
     public static final String CLUSTER_STATE_PATH_TOKEN = "cluster-state";
     public static final String GLOBAL_METADATA_PATH_TOKEN = "global-metadata";
     public static final String CLUSTER_STATE_EPHEMERAL_PATH_TOKEN = "ephemeral";
+    public static final int GLOBAL_METADATA_CURRENT_CODEC_VERSION = 1;
     public static final String DELIMITER = "__";
     public static final String PATH_DELIMITER = "/";
 
