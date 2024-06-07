@@ -44,7 +44,7 @@ import org.opensearch.test.OpenSearchTestCase;
 import org.opensearch.threadpool.TestThreadPool;
 import org.opensearch.threadpool.ThreadPool;
 
-public class RemotePersistentSettingsMetadataTest extends OpenSearchTestCase {
+public class RemotePersistentSettingsMetadataTests extends OpenSearchTestCase {
     private static final String TEST_BLOB_NAME = "/test-path/test-blob-name";
     private static final String TEST_BLOB_PATH = "test-path";
     private static final String TEST_BLOB_FILE_NAME = "test-blob-name";
