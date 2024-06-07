@@ -186,6 +186,7 @@ public class Coordinator extends AbstractLifecycleComponent implements Discovery
     private final NodeHealthService nodeHealthService;
     private final PersistedStateRegistry persistedStateRegistry;
     private final RemoteStoreNodeService remoteStoreNodeService;
+    private final RemoteClusterStateService remoteClusterStateService;
 
     /**
      * @param nodeName The name of the node, used to name the {@link java.util.concurrent.ExecutorService} of the {@link SeedHostsResolver}.
@@ -300,6 +301,7 @@ public class Coordinator extends AbstractLifecycleComponent implements Discovery
         this.persistedStateRegistry = persistedStateRegistry;
         this.localNodeCommissioned = true;
         this.remoteStoreNodeService = remoteStoreNodeService;
+        this.remoteClusterStateService = remoteClusterStateService;
     }
 
     private ClusterFormationState getClusterFormationState() {
@@ -1324,7 +1326,8 @@ public class Coordinator extends AbstractLifecycleComponent implements Discovery
 
                 final PublicationTransportHandler.PublicationContext publicationContext = publicationHandler.newPublicationContext(
                     clusterChangedEvent,
-                    coordinationState.get().isRemotePublicationEnabled()
+                    coordinationState.get().isRemotePublicationEnabled(),
+                    remoteClusterStateService.getLastUploadedManifestFileName()
                 );
 
                 final PublishRequest publishRequest = coordinationState.get().handleClientValue(clusterState);

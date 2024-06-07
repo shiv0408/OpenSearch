@@ -68,6 +68,7 @@ import org.opensearch.common.CheckedRunnable;
 import org.opensearch.common.Nullable;
 import org.opensearch.common.blobstore.BlobContainer;
 import org.opensearch.common.blobstore.BlobStore;
+import org.opensearch.common.collect.Tuple;
 import org.opensearch.common.settings.ClusterSettings;
 import org.opensearch.common.settings.Setting;
 import org.opensearch.common.settings.Setting.Property;
@@ -154,6 +155,7 @@ public class RemoteClusterStateService implements Closeable {
     private RemoteManifestManager remoteManifestManager;
     private ClusterSettings clusterSettings;
     private NamedWriteableRegistry namedWriteableRegistry;
+    private String latestManifestFileName;
     private final String CLUSTER_STATE_UPLOAD_TIME_LOG_STRING = "writing cluster state for version [{}] took [{}ms]";
     private final String METADATA_UPDATE_LOG_STRING = "wrote metadata for [{}] indices and skipped [{}] unchanged "
         + "indices, coordination metadata updated : [{}], settings metadata updated : [{}], templates metadata "
@@ -233,15 +235,16 @@ public class RemoteClusterStateService implements Closeable {
             true
         );
 
-        final ClusterMetadataManifest manifest = remoteManifestManager.uploadManifest(
+        final Tuple<ClusterMetadataManifest, String> manifestDetails = remoteManifestManager.uploadManifest(
             clusterState,
             uploadedMetadataResults,
             previousClusterUUID,
             new ClusterStateDiffManifest(clusterState, ClusterState.EMPTY_STATE),
             false
         );
+        this.latestManifestFileName = manifestDetails.v2();
 
-        logger.info("MANIFEST IN FULL STATE {}", manifest);
+        logger.info("MANIFEST IN FULL STATE {}", manifestDetails.v1());
         final long durationMillis = TimeValue.nsecToMSec(relativeTimeNanosSupplier.getAsLong() - startTimeNanos);
         remoteStateStats.stateSucceeded();
         remoteStateStats.stateTook(durationMillis);
@@ -259,7 +262,7 @@ public class RemoteClusterStateService implements Closeable {
                 uploadedMetadataResults.uploadedIndexMetadata.size()
             );
         }
-        return manifest;
+        return manifestDetails.v1();
     }
 
     /**
@@ -424,22 +427,23 @@ public class RemoteClusterStateService implements Closeable {
         uploadedMetadataResults.uploadedIndexMetadata = new ArrayList<>(allUploadedIndexMetadata.values());
         uploadedMetadataResults.uploadedIndicesRoutingMetadata = allUploadedIndicesRouting;
 
-        final ClusterMetadataManifest manifest = remoteManifestManager.uploadManifest(
+        final Tuple<ClusterMetadataManifest, String> manifestDetails = remoteManifestManager.uploadManifest(
             clusterState,
             uploadedMetadataResults,
             previousManifest.getPreviousClusterUUID(),
             new ClusterStateDiffManifest(clusterState, previousClusterState),
             false
         );
+        this.latestManifestFileName = manifestDetails.v2();
 
-        logger.info("MANIFEST IN INC STATE {}", manifest);
+        logger.info("MANIFEST IN INC STATE {}", manifestDetails.v1());
 
         final long durationMillis = TimeValue.nsecToMSec(relativeTimeNanosSupplier.getAsLong() - startTimeNanos);
         remoteStateStats.stateSucceeded();
         remoteStateStats.stateTook(durationMillis);
         ParameterizedMessage clusterStateUploadTimeMessage = new ParameterizedMessage(
             CLUSTER_STATE_UPLOAD_TIME_LOG_STRING,
-            manifest.getStateVersion(),
+            manifestDetails.v1().getStateVersion(),
             durationMillis
         );
         ParameterizedMessage metadataUpdateMessage = new ParameterizedMessage(
@@ -471,7 +475,7 @@ public class RemoteClusterStateService implements Closeable {
                 "writing cluster state for version [{}] took [{}ms]; "
                     + "wrote metadata for [{}] indices and skipped [{}] unchanged indices, coordination metadata updated : [{}], "
                     + "settings metadata updated : [{}], templates metadata updated : [{}], custom metadata updated : [{}]",
-                manifest.getStateVersion(),
+                manifestDetails.v1().getStateVersion(),
                 durationMillis,
                 numIndicesUpdated,
                 numIndicesUnchanged,
@@ -481,7 +485,7 @@ public class RemoteClusterStateService implements Closeable {
                 customsToUpload.size()
             );
         }
-        return manifest;
+        return manifestDetails.v1();
     }
 
     private UploadedMetadataResults writeMetadataInParallel(
@@ -816,18 +820,23 @@ public class RemoteClusterStateService implements Closeable {
             previousManifest.getClusterStateCustomMap()
         );
 
-        ClusterMetadataManifest committedManifest = remoteManifestManager.uploadManifest(
+        Tuple<ClusterMetadataManifest, String> committedManifestDetails = remoteManifestManager.uploadManifest(
             clusterState,
             uploadedMetadataResults,
             previousManifest.getPreviousClusterUUID(),
             previousManifest.getDiffManifest(),
             true
         );
-        if (!previousManifest.isClusterUUIDCommitted() && committedManifest.isClusterUUIDCommitted()) {
-            remoteClusterStateCleanupManager.deleteStaleClusterUUIDs(clusterState, committedManifest);
+        this.latestManifestFileName = committedManifestDetails.v2();
+        if (!previousManifest.isClusterUUIDCommitted() && committedManifestDetails.v1().isClusterUUIDCommitted()) {
+            remoteClusterStateCleanupManager.deleteStaleClusterUUIDs(clusterState, committedManifestDetails.v1());
         }
 
-        return committedManifest;
+        return committedManifestDetails.v1();
+    }
+
+    public String getLastUploadedManifestFileName() {
+        return this.latestManifestFileName;
     }
 
     /**
@@ -843,6 +852,10 @@ public class RemoteClusterStateService implements Closeable {
 
     public Optional<ClusterMetadataManifest> getClusterMetadataManifestByTermVersion(String clusterName, String clusterUUID, long term, long version) {
         return remoteManifestManager.getClusterMetadataManifestByTermVersion(clusterName, clusterUUID, term, version);
+    }
+
+    public ClusterMetadataManifest getClusterMetadataManifestByFileName(String clusterUUID, String fileName) {
+        return remoteManifestManager.getRemoteClusterMetadataManifestByFileName(clusterUUID, fileName);
     }
 
     @Override

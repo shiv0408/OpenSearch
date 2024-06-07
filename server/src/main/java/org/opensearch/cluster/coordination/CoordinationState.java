@@ -107,10 +107,6 @@ public class CoordinationState {
         this.isRemotePublicationEnabled = RemoteStoreNodeAttribute.isRemotePublicationEnabled(settings);
     }
 
-    public boolean isRemoteStateEnabled() {
-        return isRemoteStateEnabled;
-    }
-
     public boolean isRemotePublicationEnabled() {
         return isRemotePublicationEnabled;
     }

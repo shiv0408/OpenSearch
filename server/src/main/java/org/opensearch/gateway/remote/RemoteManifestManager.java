@@ -30,6 +30,7 @@ import org.opensearch.cluster.ClusterState;
 import org.opensearch.common.blobstore.BlobContainer;
 import org.opensearch.common.blobstore.BlobMetadata;
 import org.opensearch.common.blobstore.BlobPath;
+import org.opensearch.common.collect.Tuple;
 import org.opensearch.common.settings.ClusterSettings;
 import org.opensearch.common.settings.Setting;
 import org.opensearch.common.unit.TimeValue;
@@ -71,7 +72,7 @@ public class RemoteManifestManager {
         this.blobStoreRepository = blobStoreRepository;
     }
 
-    ClusterMetadataManifest uploadManifest(
+    Tuple<ClusterMetadataManifest, String> uploadManifest(
         ClusterState clusterState,
         RemoteClusterStateUtils.UploadedMetadataResults uploadedMetadataResult,
         String previousClusterUUID,
@@ -105,12 +106,12 @@ public class RemoteManifestManager {
                 .clusterStateCustomMetadataMap(uploadedMetadataResult.uploadedClusterStateCustomMetadataMap)
                 .hashesOfConsistentSettings(uploadedMetadataResult.uploadedHashesOfConsistentSettings);
             final ClusterMetadataManifest manifest = manifestBuilder.build();
-            writeMetadataManifest(clusterState.getClusterName().value(), clusterState.metadata().clusterUUID(), manifest);
-            return manifest;
+            String manifestFileName = writeMetadataManifest(clusterState.getClusterName().value(), clusterState.metadata().clusterUUID(), manifest);
+            return new Tuple<>(manifest, manifestFileName);
         }
     }
 
-    private void writeMetadataManifest(String clusterName, String clusterUUID, ClusterMetadataManifest uploadManifest) {
+    private String writeMetadataManifest(String clusterName, String clusterUUID, ClusterMetadataManifest uploadManifest) {
         AtomicReference<String> result = new AtomicReference<String>();
         AtomicReference<Exception> exceptionReference = new AtomicReference<Exception>();
 
@@ -147,6 +148,7 @@ public class RemoteManifestManager {
             remoteClusterMetadataManifest.getBlobFileName(),
             uploadManifest.isCommitted() ? "commit" : "publish"
         );
+        return remoteClusterMetadataManifest.getUploadedMetadata().getUploadedFilename();
     }
 
     /**
@@ -172,6 +174,16 @@ public class RemoteManifestManager {
     public Optional<ClusterMetadataManifest> getClusterMetadataManifestByTermVersion(String clusterName, String clusterUUID, long term, long version) {
         Optional<String> manifestFileName = getManifestFileNameByTermVersion(clusterName, clusterUUID, term, version);
         return manifestFileName.map(s -> fetchRemoteClusterMetadataManifest(clusterName, clusterUUID, s));
+    }
+
+    public ClusterMetadataManifest getRemoteClusterMetadataManifestByFileName(String clusterUUID, String filename)
+        throws IllegalStateException {
+        try {
+            RemoteClusterMetadataManifest remoteClusterMetadataManifest = new RemoteClusterMetadataManifest(filename, clusterUUID, compressor, namedXContentRegistry);
+            return manifestBlobStore.read(remoteClusterMetadataManifest);
+        } catch (IOException e) {
+            throw new IllegalStateException(String.format(Locale.ROOT, "Error while downloading cluster metadata - %s", filename), e);
+        }
     }
 
     /**
