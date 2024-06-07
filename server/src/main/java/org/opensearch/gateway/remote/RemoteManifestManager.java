@@ -39,6 +39,7 @@ import org.opensearch.core.compress.Compressor;
 import org.opensearch.core.xcontent.NamedXContentRegistry;
 import org.opensearch.gateway.remote.model.RemoteClusterStateBlobStore;
 import org.opensearch.gateway.remote.model.RemoteClusterMetadataManifest;
+import org.opensearch.gateway.remote.model.RemoteUploadDetails;
 import org.opensearch.index.remote.RemoteStoreUtils;
 import org.opensearch.repositories.blobstore.BlobStoreRepository;
 
@@ -72,7 +73,7 @@ public class RemoteManifestManager {
         this.blobStoreRepository = blobStoreRepository;
     }
 
-    Tuple<ClusterMetadataManifest, String> uploadManifest(
+    RemoteUploadDetails uploadManifest(
         ClusterState clusterState,
         RemoteClusterStateUtils.UploadedMetadataResults uploadedMetadataResult,
         String previousClusterUUID,
@@ -107,7 +108,7 @@ public class RemoteManifestManager {
                 .hashesOfConsistentSettings(uploadedMetadataResult.uploadedHashesOfConsistentSettings);
             final ClusterMetadataManifest manifest = manifestBuilder.build();
             String manifestFileName = writeMetadataManifest(clusterState.getClusterName().value(), clusterState.metadata().clusterUUID(), manifest);
-            return new Tuple<>(manifest, manifestFileName);
+            return new RemoteUploadDetails(manifest, manifestFileName);
         }
     }
 

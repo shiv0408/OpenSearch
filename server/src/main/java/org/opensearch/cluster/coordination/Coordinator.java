@@ -48,6 +48,7 @@ import org.opensearch.cluster.coordination.CoordinationMetadata.VotingConfigurat
 import org.opensearch.cluster.coordination.CoordinationState.VoteCollection;
 import org.opensearch.cluster.coordination.FollowersChecker.FollowerCheckRequest;
 import org.opensearch.cluster.coordination.JoinHelper.InitialJoinAccumulator;
+import org.opensearch.cluster.coordination.PersistedStateRegistry.PersistedStateType;
 import org.opensearch.cluster.metadata.Metadata;
 import org.opensearch.cluster.node.DiscoveryNode;
 import org.opensearch.cluster.node.DiscoveryNodes;
@@ -84,6 +85,7 @@ import org.opensearch.discovery.HandshakingTransportAddressConnector;
 import org.opensearch.discovery.PeerFinder;
 import org.opensearch.discovery.SeedHostsProvider;
 import org.opensearch.discovery.SeedHostsResolver;
+import org.opensearch.gateway.GatewayMetaState.RemotePersistedState;
 import org.opensearch.gateway.remote.RemoteClusterStateService;
 import org.opensearch.monitor.NodeHealthService;
 import org.opensearch.monitor.StatusInfo;
@@ -186,7 +188,6 @@ public class Coordinator extends AbstractLifecycleComponent implements Discovery
     private final NodeHealthService nodeHealthService;
     private final PersistedStateRegistry persistedStateRegistry;
     private final RemoteStoreNodeService remoteStoreNodeService;
-    private final RemoteClusterStateService remoteClusterStateService;
 
     /**
      * @param nodeName The name of the node, used to name the {@link java.util.concurrent.ExecutorService} of the {@link SeedHostsResolver}.
@@ -301,7 +302,6 @@ public class Coordinator extends AbstractLifecycleComponent implements Discovery
         this.persistedStateRegistry = persistedStateRegistry;
         this.localNodeCommissioned = true;
         this.remoteStoreNodeService = remoteStoreNodeService;
-        this.remoteClusterStateService = remoteClusterStateService;
     }
 
     private ClusterFormationState getClusterFormationState() {
@@ -1327,7 +1327,7 @@ public class Coordinator extends AbstractLifecycleComponent implements Discovery
                 final PublicationTransportHandler.PublicationContext publicationContext = publicationHandler.newPublicationContext(
                     clusterChangedEvent,
                     coordinationState.get().isRemotePublicationEnabled(),
-                    remoteClusterStateService.getLastUploadedManifestFileName()
+                    ((RemotePersistedState) persistedStateRegistry.getPersistedState(PersistedStateType.REMOTE))
                 );
 
                 final PublishRequest publishRequest = coordinationState.get().handleClientValue(clusterState);
