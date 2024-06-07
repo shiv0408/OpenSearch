@@ -666,6 +666,7 @@ public class GatewayMetaState implements Closeable {
 
         private ClusterState lastAcceptedState;
         private ClusterMetadataManifest lastAcceptedManifest;
+
         private String lastUploadedManifestFile;
         private final RemoteClusterStateService remoteClusterStateService;
         private String previousClusterUUID;
@@ -690,6 +691,10 @@ public class GatewayMetaState implements Closeable {
             // no-op
             // For LucenePersistedState, setCurrentTerm is used only while handling StartJoinRequest by all follower nodes.
             // But for RemotePersistedState, the state is only pushed by the active cluster. So this method is not required.
+        }
+
+        public String getLastUploadedManifestFile() {
+            return lastUploadedManifestFile;
         }
 
         @Override

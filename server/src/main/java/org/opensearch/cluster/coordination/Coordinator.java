@@ -1327,7 +1327,7 @@ public class Coordinator extends AbstractLifecycleComponent implements Discovery
                 final PublicationTransportHandler.PublicationContext publicationContext = publicationHandler.newPublicationContext(
                     clusterChangedEvent,
                     coordinationState.get().isRemotePublicationEnabled(),
-                    ((RemotePersistedState) persistedStateRegistry.getPersistedState(PersistedStateType.REMOTE))
+                    persistedStateRegistry
                 );
 
                 final PublishRequest publishRequest = coordinationState.get().handleClientValue(clusterState);

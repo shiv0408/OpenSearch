@@ -300,8 +300,8 @@ public class PublicationTransportHandler {
     }
 
     public PublicationContext newPublicationContext(ClusterChangedEvent clusterChangedEvent, boolean isRemotePublicationEnabled,
-        String manifestFileName) {
-        final PublicationContext publicationContext = new PublicationContext(clusterChangedEvent, isRemotePublicationEnabled, manifestFileName);
+        PersistedStateRegistry persistedStateRegistry) {
+        final PublicationContext publicationContext = new PublicationContext(clusterChangedEvent, isRemotePublicationEnabled, persistedStateRegistry);
 
         // Build the serializations we expect to need now, early in the process, so that an error during serialization fails the publication
         // straight away. This isn't watertight since we send diffs on a best-effort basis and may fall back to sending a full state (and
@@ -347,15 +347,15 @@ public class PublicationTransportHandler {
         private final Map<Version, BytesReference> serializedStates = new HashMap<>();
         private final Map<Version, BytesReference> serializedDiffs = new HashMap<>();
         private final boolean sendRemoteState;
-        private final String manifestFileName;
+        private final PersistedStateRegistry persistedStateRegistry;
 
-        PublicationContext(ClusterChangedEvent clusterChangedEvent, boolean isRemotePublicationEnabled, String manifestFileName) {
+        PublicationContext(ClusterChangedEvent clusterChangedEvent, boolean isRemotePublicationEnabled, PersistedStateRegistry persistedStateRegistry) {
             discoveryNodes = clusterChangedEvent.state().nodes();
             newState = clusterChangedEvent.state();
             previousState = clusterChangedEvent.previousState();
             sendFullVersion = previousState.getBlocks().disableStatePersistence();
             sendRemoteState = isRemotePublicationEnabled;
-            this.manifestFileName = manifestFileName;
+            this.persistedStateRegistry = persistedStateRegistry;
         }
 
         void buildDiffAndSerializeStates() {
@@ -468,6 +468,7 @@ public class PublicationTransportHandler {
 
         private void sendRemoteClusterState(final DiscoveryNode destination, final ClusterState clusterState, final ActionListener<PublishWithJoinResponse> listener) {
             try {
+                final String manifestFileName = ((RemotePersistedState) persistedStateRegistry.getPersistedState(PersistedStateType.REMOTE)).getLastUploadedManifestFile();
                 final RemotePublishRequest remotePublishRequest = new RemotePublishRequest(discoveryNodes.getLocalNode(), clusterState.term(),
                     clusterState.getVersion(), clusterState.getClusterName().value(), clusterState.metadata().clusterUUID(), manifestFileName);
                 final Consumer<TransportException> transportExceptionHandler = exp -> {

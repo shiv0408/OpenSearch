@@ -16,7 +16,6 @@ import java.io.IOException;
 
 public class RemotePublishRequest extends TermVersionRequest {
 
-    // todo Do we need cluster name and UUID ?
     private final String clusterName;
     private final String clusterUUID;
     private final String manifestFile;
