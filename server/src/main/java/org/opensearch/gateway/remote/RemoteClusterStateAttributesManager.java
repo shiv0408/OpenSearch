@@ -16,6 +16,7 @@ import org.opensearch.cluster.block.ClusterBlocks;
 import org.opensearch.cluster.node.DiscoveryNodes;
 import org.opensearch.common.CheckedRunnable;
 import org.opensearch.core.action.ActionListener;
+import org.opensearch.core.common.io.stream.NamedWriteableRegistry;
 import org.opensearch.core.compress.Compressor;
 import org.opensearch.core.xcontent.NamedXContentRegistry;
 import org.opensearch.core.xcontent.ToXContent;
@@ -45,14 +46,22 @@ public class RemoteClusterStateAttributesManager {
     private final RemoteClusterStateBlobStore<Custom, RemoteClusterStateCustoms> customsBlobStore;
     private final Compressor compressor;
     private final NamedXContentRegistry namedXContentRegistry;
+    private final NamedWriteableRegistry namedWriteableRegistry;
 
     RemoteClusterStateAttributesManager(
-        RemoteClusterStateBlobStore<ClusterBlocks, RemoteClusterBlocks> clusterBlocksBlobStore, RemoteClusterStateBlobStore<DiscoveryNodes, RemoteDiscoveryNodes> discoveryNodesBlobStore, RemoteClusterStateBlobStore<Custom, RemoteClusterStateCustoms> customsBlobStore, Compressor compressor, NamedXContentRegistry namedXContentRegistry) {
+        RemoteClusterStateBlobStore<ClusterBlocks, RemoteClusterBlocks> clusterBlocksBlobStore,
+        RemoteClusterStateBlobStore<DiscoveryNodes, RemoteDiscoveryNodes> discoveryNodesBlobStore,
+        RemoteClusterStateBlobStore<Custom, RemoteClusterStateCustoms> customsBlobStore,
+        Compressor compressor,
+        NamedXContentRegistry namedXContentRegistry,
+        NamedWriteableRegistry namedWriteableRegistry
+    ) {
         this.clusterBlocksBlobStore = clusterBlocksBlobStore;
         this.discoveryNodesBlobStore = discoveryNodesBlobStore;
         this.customsBlobStore = customsBlobStore;
         this.compressor = compressor;
         this.namedXContentRegistry = namedXContentRegistry;
+        this.namedWriteableRegistry = namedWriteableRegistry;
     }
 
     /**
@@ -77,7 +86,8 @@ public class RemoteClusterStateAttributesManager {
                 clusterState.version(),
                 clusterState.metadata().clusterUUID(),
                 compressor,
-                namedXContentRegistry
+                namedXContentRegistry,
+                namedWriteableRegistry
             );
             return () -> customsBlobStore.writeAsync(remoteObject, getActionListener(component, remoteObject, latchedActionListener));
         } else {
@@ -110,7 +120,14 @@ public class RemoteClusterStateAttributesManager {
             return () -> clusterBlocksBlobStore.readAsync(remoteClusterBlocks, actionListener);
         } else if (component.equals(CLUSTER_STATE_CUSTOM)) {
             final ActionListener customActionListener = ActionListener.wrap(response -> listener.onResponse(new RemoteReadResult((ToXContent) response, CLUSTER_STATE_ATTRIBUTE, String.join(CUSTOM_DELIMITER, component, componentName))), listener::onFailure);
-            RemoteClusterStateCustoms remoteClusterStateCustoms = new RemoteClusterStateCustoms(uploadedFilename, componentName, clusterUUID, compressor, namedXContentRegistry);
+            RemoteClusterStateCustoms remoteClusterStateCustoms = new RemoteClusterStateCustoms(
+                uploadedFilename,
+                componentName,
+                clusterUUID,
+                compressor,
+                namedXContentRegistry,
+                namedWriteableRegistry
+            );
             return () -> customsBlobStore.readAsync(remoteClusterStateCustoms, customActionListener);
         } else {
             throw new RemoteStateTransferException("Remote object not found for "+ component);

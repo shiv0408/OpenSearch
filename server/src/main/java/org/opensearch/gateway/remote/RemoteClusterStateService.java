@@ -76,6 +76,7 @@ import org.opensearch.common.settings.Settings;
 import org.opensearch.common.unit.TimeValue;
 import org.opensearch.common.util.io.IOUtils;
 import org.opensearch.core.action.ActionListener;
+import org.opensearch.core.common.io.stream.NamedWriteableRegistry;
 import org.opensearch.core.index.Index;
 import org.opensearch.core.xcontent.ToXContent;
 import org.opensearch.gateway.remote.ClusterMetadataManifest.UploadedIndexMetadata;
@@ -153,6 +154,7 @@ public class RemoteClusterStateService implements Closeable {
     private RemoteClusterStateAttributesManager remoteClusterStateAttributesManager;
     private RemoteManifestManager remoteManifestManager;
     private ClusterSettings clusterSettings;
+    private NamedWriteableRegistry namedWriteableRegistry;
     private final String CLUSTER_STATE_UPLOAD_TIME_LOG_STRING = "writing cluster state for version [{}] took [{}ms]";
     private final String METADATA_UPDATE_LOG_STRING = "wrote metadata for [{}] indices and skipped [{}] unchanged "
         + "indices, coordination metadata updated : [{}], settings metadata updated : [{}], templates metadata "
@@ -169,11 +171,6 @@ public class RemoteClusterStateService implements Closeable {
         FORMAT_PARAMS = new ToXContent.MapParams(params);
     }
 
-    private String latestClusterName;
-    private String latestClusterUUID;
-    private long lastCleanupAttemptState;
-    private boolean isClusterManagerNode;
-
     public RemoteClusterStateService(
         String nodeId,
         Supplier<RepositoriesService> repositoriesService,
@@ -181,7 +178,8 @@ public class RemoteClusterStateService implements Closeable {
         ClusterService clusterService,
         LongSupplier relativeTimeNanosSupplier,
         ThreadPool threadPool,
-        List<IndexMetadataUploadListener> indexMetadataUploadListeners
+        List<IndexMetadataUploadListener> indexMetadataUploadListeners,
+        NamedWriteableRegistry namedWriteableRegistry
     ) {
         assert isRemoteStoreClusterStateEnabled(settings) : "Remote cluster state is not enabled";
         logger.info("REMOTE STATE ENABLED");
@@ -197,12 +195,10 @@ public class RemoteClusterStateService implements Closeable {
         this.remoteStateReadTimeout = clusterSettings.get(REMOTE_STATE_READ_TIMEOUT_SETTING);
         clusterSettings.addSettingsUpdateConsumer(REMOTE_STATE_READ_TIMEOUT_SETTING, this::setRemoteClusterStateEnabled);
         this.remoteStateStats = new RemotePersistenceStats();
-
+        this.namedWriteableRegistry = namedWriteableRegistry;
         this.remoteRoutingTableService = isRemoteRoutingTableEnabled(settings)
             ? Optional.of(new RemoteRoutingTableService(repositoriesService, settings, threadPool))
             : Optional.empty();
-        this.lastCleanupAttemptState = 0;
-        this.isClusterManagerNode = DiscoveryNode.isClusterManagerNode(settings);
         this.remoteClusterStateCleanupManager = new RemoteClusterStateCleanupManager(this, clusterService);
         this.indexMetadataUploadListeners = indexMetadataUploadListeners;
     }
@@ -438,9 +434,6 @@ public class RemoteClusterStateService implements Closeable {
         );
 
         logger.info("MANIFEST IN INC STATE {}", manifest);
-
-        this.latestClusterName = clusterState.getClusterName().value();
-        this.latestClusterUUID = clusterState.metadata().clusterUUID();
 
         final long durationMillis = TimeValue.nsecToMSec(relativeTimeNanosSupplier.getAsLong() - startTimeNanos);
         remoteStateStats.stateSucceeded();
@@ -904,8 +897,7 @@ public class RemoteClusterStateService implements Closeable {
         RemoteClusterStateBlobStore<ClusterState.Custom, RemoteClusterStateCustoms> clusterStateCustomsBlobStore = new RemoteClusterStateBlobStore<>(
             getBlobStoreTransferService(), blobStoreRepository, clusterName, threadpool, ThreadPool.Names.GENERIC);
         remoteClusterStateAttributesManager = new RemoteClusterStateAttributesManager(clusterBlocksBlobStore, discoveryNodesBlobStore,
-            clusterStateCustomsBlobStore,
-            blobStoreRepository.getCompressor(), blobStoreRepository.getNamedXContentRegistry());
+            clusterStateCustomsBlobStore, blobStoreRepository.getCompressor(), blobStoreRepository.getNamedXContentRegistry(), namedWriteableRegistry);
         RemoteClusterStateBlobStore<ClusterMetadataManifest, RemoteClusterMetadataManifest> manifestBlobStore = new RemoteClusterStateBlobStore<>(
             getBlobStoreTransferService(), blobStoreRepository, clusterName, threadpool, ThreadPool.Names.GENERIC);
         remoteManifestManager = new RemoteManifestManager(manifestBlobStore, clusterSettings, nodeId, blobStoreRepository.getCompressor(),
@@ -958,7 +950,6 @@ public class RemoteClusterStateService implements Closeable {
     private ClusterState readClusterStateInParallel(
         ClusterState previousState,
         ClusterMetadataManifest manifest,
-        String clusterName,
         String clusterUUID,
         String localNodeId,
         List<UploadedIndexMetadata> indicesToRead,
@@ -1233,7 +1224,6 @@ public class RemoteClusterStateService implements Closeable {
         return readClusterStateInParallel(
             ClusterState.builder(new ClusterName(clusterName)).build(),
             manifest,
-            clusterName,
             manifest.getClusterUUID(),
             localNodeId,
             manifest.getIndices(),
@@ -1279,7 +1269,6 @@ public class RemoteClusterStateService implements Closeable {
         ClusterState updatedClusterState = readClusterStateInParallel(
             previousState,
             manifest,
-            clusterName,
             manifest.getClusterUUID(),
             localNodeId,
             updatedIndices,

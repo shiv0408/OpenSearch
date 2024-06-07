@@ -8,18 +8,23 @@
 
 package org.opensearch.gateway.remote.model;
 
+import static org.opensearch.core.common.bytes.BytesReference.toBytes;
 import static org.opensearch.gateway.remote.RemoteClusterStateAttributesManager.CLUSTER_STATE_ATTRIBUTES_CURRENT_CODEC_VERSION;
 import static org.opensearch.gateway.remote.RemoteClusterStateUtils.CLUSTER_STATE_EPHEMERAL_PATH_TOKEN;
 import static org.opensearch.gateway.remote.RemoteClusterStateUtils.DELIMITER;
 import static org.opensearch.gateway.remote.RemoteClusterStateUtils.METADATA_NAME_FORMAT;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.List;
 import org.opensearch.cluster.node.DiscoveryNodes;
 import org.opensearch.common.io.Streams;
+import org.opensearch.common.io.stream.BytesStreamOutput;
 import org.opensearch.common.remote.AbstractRemoteWritableBlobEntity;
 import org.opensearch.common.remote.BlobPathParameters;
+import org.opensearch.core.common.bytes.BytesReference;
+import org.opensearch.core.common.io.stream.BytesStreamInput;
 import org.opensearch.core.compress.Compressor;
 import org.opensearch.core.xcontent.NamedXContentRegistry;
 import org.opensearch.gateway.remote.ClusterMetadataManifest.UploadedMetadata;
@@ -34,11 +39,6 @@ import org.opensearch.repositories.blobstore.ChecksumBlobStoreFormat;
 public class RemoteDiscoveryNodes extends AbstractRemoteWritableBlobEntity<DiscoveryNodes> {
 
     public static final String DISCOVERY_NODES = "nodes";
-    public static final ChecksumBlobStoreFormat<DiscoveryNodes> DISCOVERY_NODES_FORMAT = new ChecksumBlobStoreFormat<>(
-        "nodes",
-        METADATA_NAME_FORMAT,
-        DiscoveryNodes::fromXContent
-    );
 
     private DiscoveryNodes discoveryNodes;
     private long stateVersion;
@@ -81,11 +81,13 @@ public class RemoteDiscoveryNodes extends AbstractRemoteWritableBlobEntity<Disco
 
     @Override
     public InputStream serialize() throws IOException {
-        return DISCOVERY_NODES_FORMAT.serialize(discoveryNodes, generateBlobFileName(), getCompressor(), RemoteClusterStateUtils.FORMAT_PARAMS).streamInput();
+        BytesStreamOutput outputStream = new BytesStreamOutput();
+        discoveryNodes.writeTo(outputStream);
+        return outputStream.bytes().streamInput();
     }
 
     @Override
     public DiscoveryNodes deserialize(final InputStream inputStream) throws IOException {
-        return DISCOVERY_NODES_FORMAT.deserialize(blobName, getNamedXContentRegistry(), Streams.readFully(inputStream));
+        return  DiscoveryNodes.readFrom(new BytesStreamInput(toBytes(Streams.readFully(inputStream))), null);
     }
 }
