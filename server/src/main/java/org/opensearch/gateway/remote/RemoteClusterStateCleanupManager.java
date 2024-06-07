@@ -34,7 +34,7 @@ import java.util.Locale;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import static org.opensearch.gateway.remote.model.RemoteClusterMetadataManifest.MANIFEST_FILE_PREFIX;
+import static org.opensearch.gateway.remote.model.RemoteClusterMetadataManifest.MANIFEST;
 
 /**
  * A Manager which provides APIs to clean up stale cluster state files and runs an async stale cleanup task
@@ -255,7 +255,7 @@ public class RemoteClusterStateCleanupManager implements Closeable {
             getBlobStoreTransferService().listAllInSortedOrderAsync(
                 ThreadPool.Names.REMOTE_PURGE,
                 remoteClusterStateService.getRemoteManifestManager().getManifestFolderPath(clusterName, clusterUUID),
-                MANIFEST_FILE_PREFIX,
+                MANIFEST,
                 Integer.MAX_VALUE,
                 new ActionListener<>() {
                     @Override

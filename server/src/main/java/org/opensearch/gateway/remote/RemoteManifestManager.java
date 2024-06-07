@@ -214,7 +214,7 @@ public class RemoteManifestManager {
     }
 
     BlobPath getManifestFolderPath(String clusterName, String clusterUUID) {
-        return getCusterMetadataBasePath(blobStoreRepository, clusterName, clusterUUID).add(RemoteClusterMetadataManifest.MANIFEST_PATH_TOKEN);
+        return getCusterMetadataBasePath(blobStoreRepository, clusterName, clusterUUID).add(RemoteClusterMetadataManifest.MANIFEST);
     }
 
     public TimeValue getMetadataManifestUploadTimeout() {
@@ -254,7 +254,7 @@ public class RemoteManifestManager {
     static String getManifestFilePrefixForTermVersion(long term, long version) {
         return String.join(
             DELIMITER,
-            RemoteClusterMetadataManifest.MANIFEST_FILE_PREFIX,
+            RemoteClusterMetadataManifest.MANIFEST,
             RemoteStoreUtils.invertLong(term),
             RemoteStoreUtils.invertLong(version)
         ) + DELIMITER;
@@ -268,7 +268,7 @@ public class RemoteManifestManager {
      * @return latest ClusterMetadataManifest filename
      */
     private Optional<String> getLatestManifestFileName(String clusterName, String clusterUUID) throws IllegalStateException {
-        List<BlobMetadata> manifestFilesMetadata = getManifestFileNames(clusterName, clusterUUID, RemoteClusterMetadataManifest.MANIFEST_FILE_PREFIX + DELIMITER, 1);
+        List<BlobMetadata> manifestFilesMetadata = getManifestFileNames(clusterName, clusterUUID, RemoteClusterMetadataManifest.MANIFEST + DELIMITER, 1);
         if (manifestFilesMetadata != null && !manifestFilesMetadata.isEmpty()) {
             return Optional.of(manifestFilesMetadata.get(0).name());
         }

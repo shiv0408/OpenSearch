@@ -30,10 +30,9 @@ import org.opensearch.repositories.blobstore.ChecksumBlobStoreFormat;
  */
 public class RemoteClusterMetadataManifest extends AbstractRemoteWritableBlobEntity<ClusterMetadataManifest> {
 
-    public static final String MANIFEST_PATH_TOKEN = "manifest";
+    public static final String MANIFEST = "manifest";
     public static final int SPLITTED_MANIFEST_FILE_LENGTH = 6;
 
-    public static final String MANIFEST_FILE_PREFIX = "manifest";
     public static final String METADATA_MANIFEST_NAME_FORMAT = "%s";
     public static final int MANIFEST_CURRENT_CODEC_VERSION = ClusterMetadataManifest.CODEC_V3;
 
@@ -73,7 +72,7 @@ public class RemoteClusterMetadataManifest extends AbstractRemoteWritableBlobEnt
 
     @Override
     public BlobPathParameters getBlobPathParameters() {
-        return new BlobPathParameters(List.of(MANIFEST_PATH_TOKEN), MANIFEST_FILE_PREFIX);
+        return new BlobPathParameters(List.of(MANIFEST), MANIFEST);
     }
 
     @Override
@@ -82,7 +81,7 @@ public class RemoteClusterMetadataManifest extends AbstractRemoteWritableBlobEnt
         // <codec_version>
         String blobFileName = String.join(
             DELIMITER,
-            MANIFEST_FILE_PREFIX,
+            MANIFEST,
             RemoteStoreUtils.invertLong(clusterMetadataManifest.getClusterTerm()),
             RemoteStoreUtils.invertLong(clusterMetadataManifest.getStateVersion()),
             (clusterMetadataManifest.isCommitted() ? "C" : "P"), // C for committed and P for published
@@ -97,7 +96,7 @@ public class RemoteClusterMetadataManifest extends AbstractRemoteWritableBlobEnt
     @Override
     public UploadedMetadata getUploadedMetadata() {
         assert blobName != null;
-        return new UploadedMetadataAttribute(MANIFEST_PATH_TOKEN, blobName);
+        return new UploadedMetadataAttribute(MANIFEST, blobName);
     }
 
     @Override

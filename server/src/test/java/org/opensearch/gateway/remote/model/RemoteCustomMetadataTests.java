@@ -15,20 +15,20 @@ import static org.hamcrest.Matchers.lessThanOrEqualTo;
 import static org.hamcrest.Matchers.nullValue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
-import static org.opensearch.gateway.remote.model.RemoteClusterMetadataManifest.MANIFEST_CURRENT_CODEC_VERSION;
-import static org.opensearch.gateway.remote.model.RemoteClusterMetadataManifest.MANIFEST;
+import static org.opensearch.gateway.remote.RemoteGlobalMetadataManager.GLOBAL_METADATA_CURRENT_CODEC_VERSION;
+import static org.opensearch.gateway.remote.model.RemoteCustomMetadata.CUSTOM_DELIMITER;
+import static org.opensearch.gateway.remote.model.RemoteCustomMetadata.CUSTOM_METADATA;
 
-import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.util.Collections;
 import java.util.List;
 import java.util.function.Function;
 import java.util.stream.Stream;
 import org.junit.After;
 import org.junit.Before;
-import org.opensearch.Version;
 import org.opensearch.cluster.ClusterModule;
+import org.opensearch.cluster.metadata.IndexGraveyard;
+import org.opensearch.cluster.metadata.Metadata.Custom;
 import org.opensearch.common.blobstore.BlobPath;
 import org.opensearch.common.compress.DeflateCompressor;
 import org.opensearch.common.network.NetworkModule;
@@ -37,11 +37,9 @@ import org.opensearch.common.settings.ClusterSettings;
 import org.opensearch.common.settings.Settings;
 import org.opensearch.core.compress.Compressor;
 import org.opensearch.core.compress.NoneCompressor;
+import org.opensearch.core.index.Index;
 import org.opensearch.core.xcontent.NamedXContentRegistry;
-import org.opensearch.gateway.remote.ClusterMetadataManifest;
 import org.opensearch.gateway.remote.ClusterMetadataManifest.UploadedMetadata;
-import org.opensearch.gateway.remote.ClusterMetadataManifest.UploadedMetadataAttribute;
-import org.opensearch.gateway.remote.ClusterStateDiffManifest;
 import org.opensearch.gateway.remote.RemoteClusterStateUtils;
 import org.opensearch.index.remote.RemoteStoreUtils;
 import org.opensearch.index.translog.transfer.BlobStoreTransferService;
@@ -51,15 +49,12 @@ import org.opensearch.test.OpenSearchTestCase;
 import org.opensearch.threadpool.TestThreadPool;
 import org.opensearch.threadpool.ThreadPool;
 
-public class RemoteClusterMetadataManifestTests extends OpenSearchTestCase {
-
+public class RemoteCustomMetadataTests extends OpenSearchTestCase {
     private static final String TEST_BLOB_NAME = "/test-path/test-blob-name";
     private static final String TEST_BLOB_PATH = "test-path";
     private static final String TEST_BLOB_FILE_NAME = "test-blob-name";
-
-    private static final long TERM = 2L;
-    private static final long VERSION = 5L;
-
+    private static final String CUSTOM_TYPE = "test-custom";
+    private static final long METADATA_VERSION = 3L;
     private String clusterUUID;
     private BlobStoreTransferService blobStoreTransferService;
     private BlobStoreRepository blobStoreRepository;
@@ -86,6 +81,7 @@ public class RemoteClusterMetadataManifestTests extends OpenSearchTestCase {
                 ClusterModule.getNamedXWriteables().stream()
             ).flatMap(Function.identity()).collect(toList())
         );
+//        namedXContentRegistry = new NamedXContentRegistry(List.of(new Entry(Metadata.Custom.class, new ParseField(CUSTOM_TYPE), p->TestCustomMetadata.fromXContent(CustomMetadata1::new, p))));
         this.clusterName = "test-cluster-name";
     }
 
@@ -96,99 +92,90 @@ public class RemoteClusterMetadataManifestTests extends OpenSearchTestCase {
     }
 
     public void testClusterUUID() {
-        ClusterMetadataManifest manifest = getClusterMetadataManifest();
-        RemoteClusterMetadataManifest remoteObjectForUpload = new RemoteClusterMetadataManifest(manifest, clusterUUID, compressor, namedXContentRegistry);
+        Custom customMetadata = getCustomMetadata();
+        RemoteCustomMetadata remoteObjectForUpload = new RemoteCustomMetadata(customMetadata, "test-custom", METADATA_VERSION, clusterUUID, compressor, namedXContentRegistry);
         assertThat(remoteObjectForUpload.clusterUUID(), is(clusterUUID));
 
-        RemoteClusterMetadataManifest remoteObjectForDownload = new RemoteClusterMetadataManifest(TEST_BLOB_NAME, clusterUUID, compressor,
+        RemoteCustomMetadata remoteObjectForDownload = new RemoteCustomMetadata(TEST_BLOB_NAME, "test-custom", clusterUUID, compressor,
             namedXContentRegistry);
         assertThat(remoteObjectForDownload.clusterUUID(), is(clusterUUID));
     }
 
     public void testFullBlobName() {
-        ClusterMetadataManifest manifest = getClusterMetadataManifest();
-        RemoteClusterMetadataManifest remoteObjectForUpload = new RemoteClusterMetadataManifest(manifest, clusterUUID, compressor, namedXContentRegistry);
+        Custom customMetadata = getCustomMetadata();
+        RemoteCustomMetadata remoteObjectForUpload = new RemoteCustomMetadata(customMetadata, "test-custom", METADATA_VERSION, clusterUUID, compressor, namedXContentRegistry);
         assertThat(remoteObjectForUpload.getFullBlobName(), nullValue());
 
-        RemoteClusterMetadataManifest remoteObjectForDownload = new RemoteClusterMetadataManifest(TEST_BLOB_NAME, clusterUUID, compressor,
+        RemoteCustomMetadata remoteObjectForDownload = new RemoteCustomMetadata(TEST_BLOB_NAME, "test-custom", clusterUUID, compressor,
             namedXContentRegistry);
         assertThat(remoteObjectForDownload.getFullBlobName(), is(TEST_BLOB_NAME));
     }
 
     public void testBlobFileName() {
-        ClusterMetadataManifest manifest = getClusterMetadataManifest();
-        RemoteClusterMetadataManifest remoteObjectForUpload = new RemoteClusterMetadataManifest(manifest, clusterUUID, compressor, namedXContentRegistry);
+        Custom customMetadata = getCustomMetadata();
+        RemoteCustomMetadata remoteObjectForUpload = new RemoteCustomMetadata(customMetadata, "test-custom", METADATA_VERSION, clusterUUID, compressor, namedXContentRegistry);
         assertThat(remoteObjectForUpload.getBlobFileName(), nullValue());
 
-        RemoteClusterMetadataManifest remoteObjectForDownload = new RemoteClusterMetadataManifest(TEST_BLOB_NAME, clusterUUID, compressor,
+        RemoteCustomMetadata remoteObjectForDownload = new RemoteCustomMetadata(TEST_BLOB_NAME, "test-custom", clusterUUID, compressor,
             namedXContentRegistry);
         assertThat(remoteObjectForDownload.getBlobFileName(), is(TEST_BLOB_FILE_NAME));
     }
 
     public void testBlobPathTokens() {
-        String uploadedFile = "user/local/opensearch/manifest";
-        RemoteClusterMetadataManifest remoteObjectForDownload = new RemoteClusterMetadataManifest(uploadedFile, clusterUUID, compressor, namedXContentRegistry);
-        assertThat(remoteObjectForDownload.getBlobPathTokens(), is(new String[]{"user", "local", "opensearch", "manifest"}));
+        String uploadedFile = "user/local/opensearch/customMetadata";
+        RemoteCustomMetadata remoteObjectForDownload = new RemoteCustomMetadata(uploadedFile, "test-custom", clusterUUID, compressor, namedXContentRegistry);
+        assertThat(remoteObjectForDownload.getBlobPathTokens(), is(new String[]{"user", "local", "opensearch", "customMetadata"}));
     }
 
     public void testBlobPathParameters() {
-        ClusterMetadataManifest manifest = getClusterMetadataManifest();
-        RemoteClusterMetadataManifest remoteObjectForUpload = new RemoteClusterMetadataManifest(manifest, clusterUUID, compressor, namedXContentRegistry);
+        Custom customMetadata = getCustomMetadata();
+        RemoteCustomMetadata remoteObjectForUpload = new RemoteCustomMetadata(customMetadata, "test-custom", METADATA_VERSION, clusterUUID, compressor, namedXContentRegistry);
         BlobPathParameters params = remoteObjectForUpload.getBlobPathParameters();
-        assertThat(params.getPathTokens(), is(List.of(MANIFEST)));
-        assertThat(params.getFilePrefix(), is(RemoteClusterMetadataManifest.MANIFEST));
+        assertThat(params.getPathTokens(), is(List.of(RemoteClusterStateUtils.GLOBAL_METADATA_PATH_TOKEN)));
+        String expectedPrefix = CUSTOM_METADATA + CUSTOM_DELIMITER + CUSTOM_TYPE;
+        assertThat(params.getFilePrefix(), is(expectedPrefix));
     }
 
     public void testGenerateBlobFileName() {
-        ClusterMetadataManifest manifest = getClusterMetadataManifest();
-        RemoteClusterMetadataManifest remoteObjectForUpload = new RemoteClusterMetadataManifest(manifest, clusterUUID, compressor, namedXContentRegistry);
+        Custom customMetadata = getCustomMetadata();
+        RemoteCustomMetadata remoteObjectForUpload = new RemoteCustomMetadata(customMetadata, "test-custom", METADATA_VERSION, clusterUUID, compressor, namedXContentRegistry);
         String blobFileName = remoteObjectForUpload.generateBlobFileName();
         String[] nameTokens = blobFileName.split(RemoteClusterStateUtils.DELIMITER);
-        assertThat(nameTokens[0], is(RemoteClusterMetadataManifest.MANIFEST));
-        assertThat(RemoteStoreUtils.invertLong(nameTokens[1]), is(TERM));
-        assertThat(RemoteStoreUtils.invertLong(nameTokens[2]), is(VERSION));
-        assertThat(nameTokens[3], is("C"));
-        assertThat(RemoteStoreUtils.invertLong(nameTokens[4]), lessThanOrEqualTo(System.currentTimeMillis()));
-        assertThat(nameTokens[5], is(String.valueOf(MANIFEST_CURRENT_CODEC_VERSION)));
+        String expectedPrefix = CUSTOM_METADATA + CUSTOM_DELIMITER + CUSTOM_TYPE;
+        assertThat(nameTokens[0], is(expectedPrefix));
+        assertThat(RemoteStoreUtils.invertLong(nameTokens[1]), is(METADATA_VERSION));
+        assertThat(RemoteStoreUtils.invertLong(nameTokens[2]), lessThanOrEqualTo(System.currentTimeMillis()));
+        assertThat(nameTokens[3], is(String.valueOf(GLOBAL_METADATA_CURRENT_CODEC_VERSION)));
+
     }
 
     public void testGetUploadedMetadata() throws IOException {
-        ClusterMetadataManifest manifest = getClusterMetadataManifest();
-        RemoteClusterMetadataManifest remoteObjectForUpload = new RemoteClusterMetadataManifest(manifest, clusterUUID, compressor, namedXContentRegistry);
+        Custom customMetadata = getCustomMetadata();
+        RemoteCustomMetadata remoteObjectForUpload = new RemoteCustomMetadata(customMetadata, "test-custom", METADATA_VERSION, clusterUUID, compressor, namedXContentRegistry);
         assertThrows(AssertionError.class, remoteObjectForUpload::getUploadedMetadata);
 
         try (InputStream inputStream = remoteObjectForUpload.serialize()) {
             remoteObjectForUpload.setFullBlobName(new BlobPath().add(TEST_BLOB_PATH));
             UploadedMetadata uploadedMetadata = remoteObjectForUpload.getUploadedMetadata();
-            assertThat(uploadedMetadata.getComponent(), is(MANIFEST));
+            String expectedPrefix = CUSTOM_METADATA + CUSTOM_DELIMITER + CUSTOM_TYPE;
+            assertThat(uploadedMetadata.getComponent(), is(expectedPrefix));
             assertThat(uploadedMetadata.getUploadedFilename(), is(remoteObjectForUpload.getFullBlobName()));
         }
     }
 
     public void testSerDe() throws IOException {
-        ClusterMetadataManifest manifest = getClusterMetadataManifest();
-        RemoteClusterMetadataManifest remoteObjectForUpload = new RemoteClusterMetadataManifest(manifest, clusterUUID, compressor, namedXContentRegistry);
+        Custom customMetadata = getCustomMetadata();
+        RemoteCustomMetadata remoteObjectForUpload = new RemoteCustomMetadata(customMetadata, IndexGraveyard.TYPE, METADATA_VERSION, clusterUUID, compressor, namedXContentRegistry);
         try (InputStream inputStream = remoteObjectForUpload.serialize()) {
             remoteObjectForUpload.setFullBlobName(BlobPath.cleanPath());
             assertThat(inputStream.available(), greaterThan(0));
-            ClusterMetadataManifest readManifest = remoteObjectForUpload.deserialize(inputStream);
-            assertThat(readManifest, is(manifest));
+            Custom readCustomMetadata = remoteObjectForUpload.deserialize(inputStream);
+            assertThat(readCustomMetadata, is(customMetadata));
         }
-
-        String blobName = "/usr/local/manifest__1__2__3__4__5__6";
-        RemoteClusterMetadataManifest invalidRemoteObject = new RemoteClusterMetadataManifest(blobName, clusterUUID, compressor, namedXContentRegistry);
-        assertThrows(IllegalArgumentException.class, () -> invalidRemoteObject.deserialize(new ByteArrayInputStream(new byte[0])));
     }
 
-    private ClusterMetadataManifest getClusterMetadataManifest() {
-        return ClusterMetadataManifest.builder().opensearchVersion(Version.CURRENT).codecVersion(MANIFEST_CURRENT_CODEC_VERSION).nodeId("test-node")
-            .clusterUUID("test-uuid").previousClusterUUID("_NA_").stateUUID("state-uuid").clusterTerm(TERM).stateVersion(VERSION).committed(true)
-            .coordinationMetadata(new UploadedMetadataAttribute("test-attr", "uploaded-file")).diffManifest(
-                ClusterStateDiffManifest.builder().fromStateUUID("from-uuid").toStateUUID("to-uuid").indicesUpdated(Collections.emptyList())
-                    .indicesDeleted(Collections.emptyList())
-                    .customMetadataUpdated(Collections.emptyList()).customMetadataDeleted(Collections.emptyList())
-                    .indicesRoutingUpdated(Collections.emptyList()).indicesRoutingDeleted(Collections.emptyList())
-                    .clusterStateCustomUpdated(Collections.emptyList()).clusterStateCustomDeleted(Collections.emptyList()).build())
-            .build();
+    private Custom getCustomMetadata() {
+        return IndexGraveyard.builder().addTombstone(new Index("test-index", "3q2423")).build();
     }
+
 }

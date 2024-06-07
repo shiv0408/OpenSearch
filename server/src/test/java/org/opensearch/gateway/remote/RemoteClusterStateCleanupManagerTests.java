@@ -63,12 +63,11 @@ import static org.opensearch.gateway.remote.RemoteClusterStateUtils.DELIMITER;
 import static org.opensearch.gateway.remote.RemoteClusterStateUtils.GLOBAL_METADATA_PATH_TOKEN;
 import static org.opensearch.gateway.remote.RemoteClusterStateUtils.encodeString;
 import static org.opensearch.gateway.remote.RemoteClusterStateUtils.getCusterMetadataBasePath;
+import static org.opensearch.gateway.remote.model.RemoteClusterMetadataManifest.MANIFEST;
 import static org.opensearch.gateway.remote.model.RemoteCoordinationMetadata.COORDINATION_METADATA;
 import static org.opensearch.gateway.remote.model.RemotePersistentSettingsMetadata.SETTING_METADATA;
 import static org.opensearch.gateway.remote.model.RemoteTemplatesMetadata.TEMPLATES_METADATA;
 import static org.opensearch.gateway.remote.model.RemoteIndexMetadata.INDEX_PATH_TOKEN;
-import static org.opensearch.gateway.remote.model.RemoteClusterMetadataManifest.MANIFEST_FILE_PREFIX;
-import static org.opensearch.gateway.remote.model.RemoteClusterMetadataManifest.MANIFEST_PATH_TOKEN;
 import static org.opensearch.node.remotestore.RemoteStoreNodeAttribute.REMOTE_STORE_CLUSTER_STATE_REPOSITORY_NAME_ATTRIBUTE_KEY;
 import static org.opensearch.node.remotestore.RemoteStoreNodeAttribute.REMOTE_STORE_REPOSITORY_SETTINGS_ATTRIBUTE_KEY_PREFIX;
 import static org.opensearch.node.remotestore.RemoteStoreNodeAttribute.REMOTE_STORE_REPOSITORY_TYPE_ATTRIBUTE_KEY_FORMAT;
@@ -221,7 +220,7 @@ public class RemoteClusterStateCleanupManagerTests extends OpenSearchTestCase {
             List.of(new BlobPath().add(INDEX_PATH_TOKEN).add(index1Metadata.getIndexUUID()).buildAsString() + index1Metadata.getUploadedFilePath() + ".dat")
         );
         Set<String> staleManifest = new HashSet<>();
-        inactiveBlobs.forEach(blob -> staleManifest.add(new BlobPath().add(MANIFEST_PATH_TOKEN).buildAsString() + blob.name()));
+        inactiveBlobs.forEach(blob -> staleManifest.add(new BlobPath().add(MANIFEST).buildAsString() + blob.name()));
         verify(container).deleteBlobsIgnoringIfNotExists(new ArrayList<>(staleManifest));
     }
 
@@ -257,14 +256,14 @@ public class RemoteClusterStateCleanupManagerTests extends OpenSearchTestCase {
         });
         when(
             manifest2Container.listBlobsByPrefixInSortedOrder(
-                MANIFEST_FILE_PREFIX + DELIMITER,
+                MANIFEST + DELIMITER,
                 Integer.MAX_VALUE,
                 BlobContainer.BlobNameSortOrder.LEXICOGRAPHIC
             )
         ).thenReturn(List.of(new PlainBlobMetadata("mainfest2", 1L)));
         when(
             manifest3Container.listBlobsByPrefixInSortedOrder(
-                MANIFEST_FILE_PREFIX + DELIMITER,
+                MANIFEST + DELIMITER,
                 Integer.MAX_VALUE,
                 BlobContainer.BlobNameSortOrder.LEXICOGRAPHIC
             )
