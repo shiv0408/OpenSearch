@@ -231,6 +231,8 @@ public class RemoteClusterStateService implements Closeable {
             new ClusterStateDiffManifest(clusterState, ClusterState.EMPTY_STATE),
             false
         );
+
+        logger.info("MANIFEST IN FULL STATE {}", manifestDetails.getClusterMetadataManifest());
         final long durationMillis = TimeValue.nsecToMSec(relativeTimeNanosSupplier.getAsLong() - startTimeNanos);
         remoteStateStats.stateSucceeded();
         remoteStateStats.stateTook(durationMillis);
@@ -267,6 +269,8 @@ public class RemoteClusterStateService implements Closeable {
         ClusterState clusterState,
         ClusterMetadataManifest previousManifest
     ) throws IOException {
+        logger.info("WRITING INCREMENTAL STATE");
+
         final long startTimeNanos = relativeTimeNanosSupplier.getAsLong();
         if (clusterState.nodes().isLocalNodeElectedClusterManager() == false) {
             logger.error("Local node is not elected cluster manager. Exiting");
@@ -446,13 +450,33 @@ public class RemoteClusterStateService implements Closeable {
         if (durationMillis >= slowWriteLoggingThreshold.getMillis()) {
             //TODO update logs to add more details about objects uploaded
             logger.warn(
-                "{} which is above the warn threshold of [{}]; {}",
-                clusterStateUploadTimeMessage,
+                "writing cluster state took [{}ms] which is above the warn threshold of [{}]; "
+                    + "wrote  metadata for [{}] indices and skipped [{}] unchanged indices, coordination metadata updated : [{}], "
+                    + "settings metadata updated : [{}], templates metadata updated : [{}], custom metadata updated : [{}]",
+                durationMillis,
                 slowWriteLoggingThreshold,
-                metadataUpdateMessage
+                numIndicesUpdated,
+                numIndicesUnchanged,
+                updateCoordinationMetadata,
+                updateSettingsMetadata,
+                updateTemplatesMetadata,
+                customsToUpload.size()
             );
         } else {
             logger.info("{}; {}", clusterStateUploadTimeMessage, metadataUpdateMessage);
+            logger.info(
+                "writing cluster state for version [{}] took [{}ms]; "
+                    + "wrote metadata for [{}] indices and skipped [{}] unchanged indices, coordination metadata updated : [{}], "
+                    + "settings metadata updated : [{}], templates metadata updated : [{}], custom metadata updated : [{}]",
+                manifestDetails.getClusterMetadataManifest().getStateVersion(),
+                durationMillis,
+                numIndicesUpdated,
+                numIndicesUnchanged,
+                updateCoordinationMetadata,
+                updateSettingsMetadata,
+                updateTemplatesMetadata,
+                customsToUpload.size()
+            );
         }
         return manifestDetails;
     }
@@ -723,6 +747,7 @@ public class RemoteClusterStateService implements Closeable {
                 throw new IllegalStateException("Unexpected metadata component " + uploadedMetadata.getComponent());
             }
         });
+        logger.info("response {}", response.uploadedIndicesRoutingMetadata.toString());
         return response;
     }
 
@@ -1004,13 +1029,14 @@ public class RemoteClusterStateService implements Closeable {
         boolean readTemplatesMetadata,
         boolean readDiscoveryNodes,
         boolean readClusterBlocks,
+        List<UploadedIndexMetadata> indicesRoutingToRead,
         boolean readHashesOfConsistentSettings,
         Map<String, UploadedMetadataAttribute> clusterStateCustomToRead
     ) throws IOException {
         int totalReadTasks =
             indicesToRead.size() + customToRead.size() + (readCoordinationMetadata ? 1 : 0) + (readSettingsMetadata ? 1 : 0) + (
                 readTemplatesMetadata ? 1 : 0) + (readDiscoveryNodes ? 1 : 0) + (readClusterBlocks ? 1 : 0) + (readTransientSettingsMetadata ? 1 : 0) + (readHashesOfConsistentSettings ? 1 : 0)
-                + clusterStateCustomToRead.size();
+                + clusterStateCustomToRead.size() + indicesRoutingToRead.size() ;
         CountDownLatch latch = new CountDownLatch(totalReadTasks);
         List<CheckedRunnable<IOException>> asyncMetadataReadActions = new ArrayList<>();
         List<RemoteReadResult> readResults = Collections.synchronizedList(new ArrayList<>());
@@ -1054,6 +1080,18 @@ public class RemoteClusterStateService implements Closeable {
             ),
             latch
         );
+
+        if(remoteRoutingTableService.isPresent()) {
+            for (UploadedIndexMetadata indexRouting : indicesRoutingToRead) {
+                asyncMetadataReadActions.add(
+                    remoteRoutingTableService.get().getAsyncIndexMetadataReadAction(
+                        indexRouting.getUploadedFilename(),
+                        new Index(indexRouting.getIndexName(), indexRouting.getIndexUUID()),
+                        routingTableLatchedActionListener
+                    )
+                );
+            }
+        }
 
         for (Map.Entry<String, UploadedMetadataAttribute> entry : customToRead.entrySet()) {
             asyncMetadataReadActions.add(
@@ -1237,18 +1275,20 @@ public class RemoteClusterStateService implements Closeable {
             }
         });
 
-        readIndexRoutingTableResults.forEach(indexRoutingTable -> {
-            indicesRouting.put(indexRoutingTable.getIndex().getName(), indexRoutingTable);
-        });
-
         metadataBuilder.indices(indexMetadataMap);
         if (readDiscoveryNodes) {
             clusterStateBuilder.nodes(discoveryNodesBuilder.get().localNodeId(localNodeId));
         }
-        return clusterStateBuilder.metadata(metadataBuilder)
+
+        clusterStateBuilder = clusterStateBuilder.metadata(metadataBuilder)
             .version(manifest.getStateVersion())
-            .stateUUID(manifest.getStateUUID())
-            .build();
+            .stateUUID(manifest.getStateUUID());
+
+        if(remoteRoutingTableService.isPresent()) {
+            readIndexRoutingTableResults.forEach(indexRoutingTable -> indicesRouting.put(indexRoutingTable.getIndex().getName(), indexRoutingTable));
+            clusterStateBuilder = clusterStateBuilder.routingTable(new RoutingTable(manifest.getRoutingTableVersion(), indicesRouting));
+        }
+        return clusterStateBuilder.build();
     }
 
     public ClusterState getClusterStateForManifest(String clusterName, ClusterMetadataManifest manifest, String localNodeId, boolean includeEphemeral)
@@ -1266,6 +1306,7 @@ public class RemoteClusterStateService implements Closeable {
             manifest.getTemplatesMetadata() != null,
             includeEphemeral && manifest.getDiscoveryNodesMetadata() != null,
             includeEphemeral && manifest.getClusterBlocksMetadata() != null,
+            includeEphemeral ? manifest.getIndicesRouting() : Collections.emptyList(),
             includeEphemeral && manifest.getHashesOfConsistentSettings() != null,
             includeEphemeral ? manifest.getClusterStateCustomMap() : Collections.emptyMap()
         );
@@ -1294,6 +1335,13 @@ public class RemoteClusterStateService implements Closeable {
                 updatedClusterStateCustom.put(customType, manifest.getClusterStateCustomMap().get(customType));
             }
         }
+
+        List<UploadedIndexMetadata> updatedIndexRouting = new ArrayList<>();
+        remoteRoutingTableService.ifPresent(routingTableService ->
+                updatedIndexRouting.addAll(routingTableService.getUpdatedIndexRoutingTableMetadata(diff.getIndicesRoutingUpdated(),
+                        manifest.getIndicesRouting()))
+        );
+
         ClusterState updatedClusterState = readClusterStateInParallel(
             previousState,
             manifest,
@@ -1307,6 +1355,7 @@ public class RemoteClusterStateService implements Closeable {
             diff.isTemplatesMetadataUpdated(),
             diff.isDiscoveryNodesUpdated(),
             diff.isClusterBlocksUpdated(),
+            updatedIndexRouting,
             diff.isHashesOfConsistentSettingsUpdated(),
             updatedClusterStateCustom
         );
@@ -1340,6 +1389,7 @@ public class RemoteClusterStateService implements Closeable {
             stateUUID(manifest.getStateUUID()).
             version(manifest.getStateVersion()).
             metadata(metadataBuilder).
+            routingTable(new RoutingTable(manifest.getRoutingTableVersion(), indexRoutingTables)).
             build();
     }
 

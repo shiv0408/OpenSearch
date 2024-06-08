@@ -23,6 +23,9 @@ import org.opensearch.gateway.remote.ClusterMetadataManifest;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Supplier;
+
+import static org.opensearch.node.remotestore.RemoteStoreNodeAttribute.isRemoteRoutingTableEnabled;
 
 /**
  * Interface for RemoteRoutingTableService. Exposes methods to orchestrate upload and download of routing table from remote store.
