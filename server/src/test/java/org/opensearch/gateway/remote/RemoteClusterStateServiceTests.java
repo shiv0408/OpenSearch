@@ -179,7 +179,8 @@ public class RemoteClusterStateServiceTests extends OpenSearchTestCase {
             clusterService,
             () -> 0L,
             threadPool,
-            List.of(new RemoteIndexPathUploader(threadPool, settings, repositoriesServiceSupplier, clusterSettings))
+            List.of(new RemoteIndexPathUploader(threadPool, settings, repositoriesServiceSupplier, clusterSettings)),
+            null
         );
     }
 
@@ -209,7 +210,8 @@ public class RemoteClusterStateServiceTests extends OpenSearchTestCase {
                 clusterService,
                 () -> 0L,
                 threadPool,
-                List.of(new RemoteIndexPathUploader(threadPool, settings, repositoriesServiceSupplier, clusterSettings))
+                List.of(new RemoteIndexPathUploader(threadPool, settings, repositoriesServiceSupplier, clusterSettings)),
+                null
             )
         );
     }
@@ -1186,7 +1188,8 @@ public class RemoteClusterStateServiceTests extends OpenSearchTestCase {
         List<UploadedIndexMetadata> indices = List.of(uploadedIndexMetadata);
         final ClusterMetadataManifest previousManifest = ClusterMetadataManifest.builder().indices(indices).build();
 
-        final ClusterMetadataManifest manifest = remoteClusterStateService.markLastStateAsCommitted(clusterState, previousManifest);
+        final RemoteUploadDetails manifestDetails = remoteClusterStateService.markLastStateAsCommitted(clusterState, previousManifest);
+        ClusterMetadataManifest manifest = manifestDetails.getClusterMetadataManifest();
 
         final ClusterMetadataManifest expectedManifest = ClusterMetadataManifest.builder()
             .indices(indices)
@@ -1323,7 +1326,8 @@ public class RemoteClusterStateServiceTests extends OpenSearchTestCase {
             clusterService,
             () -> 0L,
             threadPool,
-            List.of(new RemoteIndexPathUploader(threadPool, settings, repositoriesServiceSupplier, clusterSettings))
+            List.of(new RemoteIndexPathUploader(threadPool, settings, repositoriesServiceSupplier, clusterSettings)),
+            null
         );
         assertNotNull(remoteClusterStateService.getRemoteRoutingTableService());
     }
