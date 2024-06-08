@@ -8,6 +8,18 @@
 
 package org.opensearch.gateway.remote;
 
+import static org.opensearch.gateway.remote.RemoteClusterStateUtils.DELIMITER;
+
+import java.io.IOException;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.opensearch.Version;
@@ -30,18 +42,6 @@ import org.opensearch.index.translog.transfer.BlobStoreTransferService;
 import org.opensearch.repositories.blobstore.BlobStoreRepository;
 import org.opensearch.threadpool.ThreadPool;
 
-import java.io.IOException;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
-import java.util.Optional;
-import java.util.Set;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicReference;
-
-import static org.opensearch.gateway.remote.RemoteClusterStateUtils.DELIMITER;
 
 /**
  * A Manager which provides APIs to write and read {@link ClusterMetadataManifest} to remote store
@@ -95,6 +95,7 @@ public class RemoteManifestManager {
         ClusterState clusterState,
         RemoteClusterStateUtils.UploadedMetadataResults uploadedMetadataResult,
         String previousClusterUUID,
+        ClusterStateDiffManifest clusterDiffManifest,
         boolean committed
     ) {
         synchronized (this) {
@@ -114,8 +115,15 @@ public class RemoteManifestManager {
                 .settingMetadata(uploadedMetadataResult.uploadedSettingsMetadata)
                 .templatesMetadata(uploadedMetadataResult.uploadedTemplatesMetadata)
                 .customMetadataMap(uploadedMetadataResult.uploadedCustomMetadataMap)
+                .discoveryNodesMetadata(uploadedMetadataResult.uploadedDiscoveryNodes)
+                .clusterBlocksMetadata(uploadedMetadataResult.uploadedClusterBlocks)
+                .diffManifest(clusterDiffManifest)
                 .routingTableVersion(clusterState.getRoutingTable().version())
-                .indicesRouting(uploadedMetadataResult.uploadedIndicesRoutingMetadata);
+                .indicesRouting(uploadedMetadataResult.uploadedIndicesRoutingMetadata)
+                .metadataVersion(clusterState.metadata().version())
+                .transientSettingsMetadata(uploadedMetadataResult.uploadedTransientSettingsMetadata)
+                .clusterStateCustomMetadataMap(uploadedMetadataResult.uploadedClusterStateCustomMetadataMap)
+                .hashesOfConsistentSettings(uploadedMetadataResult.uploadedHashesOfConsistentSettings);
             final ClusterMetadataManifest manifest = manifestBuilder.build();
             String manifestFileName = writeMetadataManifest(clusterState.metadata().clusterUUID(), manifest);
             return new RemoteClusterStateManifestInfo(manifest, manifestFileName);

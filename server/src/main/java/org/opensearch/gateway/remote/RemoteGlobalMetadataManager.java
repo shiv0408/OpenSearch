@@ -64,9 +64,11 @@ public class RemoteGlobalMetadataManager {
     private volatile TimeValue globalMetadataUploadTimeout;
     private final RemoteWritableEntityStore<Metadata, RemoteGlobalMetadata> globalMetadataBlobStore;
     private final RemoteClusterStateBlobStore<CoordinationMetadata, RemoteCoordinationMetadata> coordinationMetadataBlobStore;
+    private final RemoteClusterStateBlobStore<Settings, RemoteTransientSettingsMetadata> transientSettingsBlobStore;
     private final RemoteClusterStateBlobStore<Settings, RemotePersistentSettingsMetadata> persistentSettingsBlobStore;
     private final RemoteClusterStateBlobStore<TemplatesMetadata, RemoteTemplatesMetadata> templatesMetadataBlobStore;
     private final RemoteClusterStateBlobStore<Custom, RemoteCustomMetadata> customMetadataBlobStore;
+    private final RemoteClusterStateBlobStore<DiffableStringMap, RemoteHashesOfConsistentSettings> hashesOfConsistentSettingsBlobStore;
     private final Compressor compressor;
     private final NamedXContentRegistry namedXContentRegistry;
 
@@ -139,6 +141,39 @@ public class RemoteGlobalMetadataManager {
         );
     }
 
+    CheckedRunnable<IOException> getAsyncMetadataReadAction(
+        String clusterUUID,
+        String component,
+        String componentName,
+        String uploadFilename,
+        LatchedActionListener<RemoteReadResult> listener
+    ) {
+        ActionListener actionListener = ActionListener.wrap(
+            response -> listener.onResponse(new RemoteReadResult((ToXContent) response, component, componentName)), listener::onFailure);
+        if (component.equals(RemoteCoordinationMetadata.COORDINATION_METADATA)) {
+            RemoteCoordinationMetadata remoteBlobStoreObject = new RemoteCoordinationMetadata(uploadFilename, clusterUUID, compressor, namedXContentRegistry);
+            return () -> coordinationMetadataBlobStore.readAsync(remoteBlobStoreObject, actionListener);
+        } else if (component.equals(RemoteTemplatesMetadata.TEMPLATES_METADATA)) {
+            RemoteTemplatesMetadata remoteBlobStoreObject = new RemoteTemplatesMetadata(uploadFilename, clusterUUID, compressor, namedXContentRegistry);
+            return () -> templatesMetadataBlobStore.readAsync(remoteBlobStoreObject, actionListener);
+        } else if (component.equals(RemotePersistentSettingsMetadata.SETTING_METADATA)) {
+            RemotePersistentSettingsMetadata remoteBlobStoreObject = new RemotePersistentSettingsMetadata(uploadFilename, clusterUUID, compressor, namedXContentRegistry);
+            return () -> persistentSettingsBlobStore.readAsync(remoteBlobStoreObject, actionListener);
+        } else if (component.equals(RemoteTransientSettingsMetadata.TRANSIENT_SETTING_METADATA)) {
+            RemoteTransientSettingsMetadata remoteBlobStoreObject = new RemoteTransientSettingsMetadata(uploadFilename, clusterUUID,
+                compressor, namedXContentRegistry);
+            return () -> transientSettingsBlobStore.readAsync(remoteBlobStoreObject, actionListener);
+        } else if (component.equals(RemoteCustomMetadata.CUSTOM_METADATA)) {
+            RemoteCustomMetadata remoteBlobStoreObject = new RemoteCustomMetadata(uploadFilename, componentName, clusterUUID, compressor, namedXContentRegistry);
+            return () -> customMetadataBlobStore.readAsync(remoteBlobStoreObject, actionListener);
+        } else if (component.equals(HASHES_OF_CONSISTENT_SETTINGS)) {
+            RemoteHashesOfConsistentSettings remoteHashesOfConsistentSettings = new RemoteHashesOfConsistentSettings(uploadFilename, clusterUUID, compressor, namedXContentRegistry);
+            return () -> hashesOfConsistentSettingsBlobStore.readAsync(remoteHashesOfConsistentSettings, actionListener);
+        } else {
+            throw new RemoteStateTransferException("Unknown component " + componentName);
+        }
+    }
+
     Metadata getGlobalMetadata(String clusterUUID, ClusterMetadataManifest clusterMetadataManifest) {
         String globalMetadataFileName = clusterMetadataManifest.getGlobalMetadataFileName();
         try {
@@ -182,6 +217,7 @@ public class RemoteGlobalMetadataManager {
                 }
                 builder.clusterUUID(clusterMetadataManifest.getClusterUUID());
                 builder.clusterUUIDCommitted(clusterMetadataManifest.isClusterUUIDCommitted());
+                builder.version(clusterMetadataManifest.getMetadataVersion());
                 clusterMetadataManifest.getCustomMetadataMap().forEach((key, value) -> {
                     try {
                         builder.putCustom(

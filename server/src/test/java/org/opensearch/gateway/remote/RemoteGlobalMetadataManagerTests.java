@@ -10,6 +10,7 @@ package org.opensearch.gateway.remote;
 
 import org.opensearch.cluster.ClusterModule;
 import org.opensearch.cluster.coordination.CoordinationMetadata;
+import org.opensearch.cluster.metadata.DiffableStringMap;
 import org.opensearch.cluster.metadata.Metadata;
 import org.opensearch.cluster.metadata.TemplatesMetadata;
 import org.opensearch.common.network.NetworkModule;
@@ -22,8 +23,10 @@ import org.opensearch.gateway.remote.model.RemoteClusterStateBlobStore;
 import org.opensearch.gateway.remote.model.RemoteCoordinationMetadata;
 import org.opensearch.gateway.remote.model.RemoteCustomMetadata;
 import org.opensearch.gateway.remote.model.RemoteGlobalMetadata;
+import org.opensearch.gateway.remote.model.RemoteHashesOfConsistentSettings;
 import org.opensearch.gateway.remote.model.RemotePersistentSettingsMetadata;
 import org.opensearch.gateway.remote.model.RemoteTemplatesMetadata;
+import org.opensearch.gateway.remote.model.RemoteTransientSettingsMetadata;
 import org.opensearch.index.translog.transfer.BlobStoreTransferService;
 import org.opensearch.indices.IndicesModule;
 import org.opensearch.repositories.blobstore.BlobStoreRepository;
@@ -53,6 +56,50 @@ public class RemoteGlobalMetadataManagerTests extends OpenSearchTestCase {
         clusterSettings = new ClusterSettings(Settings.EMPTY, ClusterSettings.BUILT_IN_CLUSTER_SETTINGS);
         blobStoreRepository = mock(BlobStoreRepository.class);
         BlobStoreTransferService blobStoreTransferService = mock(BlobStoreTransferService.class);
+        RemoteClusterStateBlobStore<Metadata, RemoteGlobalMetadata> remoteGlobalMetadataStore = new RemoteClusterStateBlobStore<>(
+            blobStoreTransferService,
+            blobStoreRepository,
+            "test-cluster",
+            threadPool,
+            "test"
+        );
+        RemoteClusterStateBlobStore<CoordinationMetadata, RemoteCoordinationMetadata> remoteCoordinationStore =
+            new RemoteClusterStateBlobStore<>(blobStoreTransferService, blobStoreRepository, "test-cluster", threadPool, "test");
+        RemoteClusterStateBlobStore<Settings, RemotePersistentSettingsMetadata> remoteSettingStore = new RemoteClusterStateBlobStore<>(
+            blobStoreTransferService,
+            blobStoreRepository,
+            "test-cluster",
+            threadPool,
+            "test"
+        );
+        RemoteClusterStateBlobStore<TemplatesMetadata, RemoteTemplatesMetadata> remoteTemplateStore = new RemoteClusterStateBlobStore<>(
+            blobStoreTransferService,
+            blobStoreRepository,
+            "test-cluster",
+            threadPool,
+            "test"
+        );
+        RemoteClusterStateBlobStore<Metadata.Custom, RemoteCustomMetadata> remoteCustomStore = new RemoteClusterStateBlobStore<>(
+            blobStoreTransferService,
+            blobStoreRepository,
+            "test-cluster",
+            threadPool,
+            "test"
+        );
+        RemoteClusterStateBlobStore<Settings, RemoteTransientSettingsMetadata> remoteTransientSettingsStore = new RemoteClusterStateBlobStore<>(
+            blobStoreTransferService,
+            blobStoreRepository,
+            "test-cluster",
+            threadPool,
+            "test"
+        );
+        RemoteClusterStateBlobStore<DiffableStringMap, RemoteHashesOfConsistentSettings> remoteHashesOfConsistentSettingsStore = new RemoteClusterStateBlobStore<>(
+            blobStoreTransferService,
+            blobStoreRepository,
+            "test-cluster",
+            threadPool,
+            "test"
+        );
         NamedXContentRegistry xContentRegistry = new NamedXContentRegistry(
             Stream.of(
                 NetworkModule.getNamedXContents().stream(),

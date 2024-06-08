@@ -8,6 +8,7 @@
 
 package org.opensearch.gateway.remote;
 
+import java.io.IOException;
 import org.opensearch.action.LatchedActionListener;
 import org.opensearch.cluster.ClusterState;
 import org.opensearch.cluster.ClusterState.Custom;
