@@ -8,7 +8,11 @@
 
 package org.opensearch.gateway.remote;
 
+import static java.util.Collections.emptyList;
+import static java.util.Collections.emptyMap;
 import static org.opensearch.gateway.PersistedClusterStateService.SLOW_WRITE_LOGGING_THRESHOLD;
+import static org.opensearch.gateway.remote.ClusterMetadataManifest.CODEC_V1;
+import static org.opensearch.gateway.remote.ClusterMetadataManifest.CODEC_V2;
 import static org.opensearch.gateway.remote.RemoteClusterStateAttributesManager.CLUSTER_BLOCKS;
 import static org.opensearch.gateway.remote.RemoteClusterStateAttributesManager.CLUSTER_STATE_ATTRIBUTE;
 import static org.opensearch.gateway.remote.RemoteClusterStateAttributesManager.DISCOVERY_NODES;
@@ -222,7 +226,7 @@ public class RemoteClusterStateService implements Closeable {
         UploadedMetadataResults uploadedMetadataResults = writeMetadataInParallel(
             clusterState,
             new ArrayList<>(clusterState.metadata().indices().values()),
-            Collections.emptyMap(),
+            emptyMap(),
             clusterState.metadata().customs(),
             true,
             true,
@@ -1226,23 +1230,48 @@ public class RemoteClusterStateService implements Closeable {
 
     public ClusterState getClusterStateForManifest(String clusterName, ClusterMetadataManifest manifest, String localNodeId, boolean includeEphemeral)
         throws IOException {
-        return readClusterStateInParallel(
-            ClusterState.builder(new ClusterName(clusterName)).build(),
-            manifest,
-            manifest.getClusterUUID(),
-            localNodeId,
-            manifest.getIndices(),
-            manifest.getCustomMetadataMap(),
-            manifest.getCoordinationMetadata() != null,
-            manifest.getSettingsMetadata() != null,
-            manifest.getTransientSettingsMetadata() != null,
-            manifest.getTemplatesMetadata() != null,
-            includeEphemeral && manifest.getDiscoveryNodesMetadata() != null,
-            includeEphemeral && manifest.getClusterBlocksMetadata() != null,
-            includeEphemeral ? manifest.getIndicesRouting() : Collections.emptyList(),
-            includeEphemeral && manifest.getHashesOfConsistentSettings() != null,
-            includeEphemeral ? manifest.getClusterStateCustomMap() : Collections.emptyMap()
-        );
+        if (manifest.onOrAfterCodecVersion(CODEC_V2)) {
+            return readClusterStateInParallel(
+                ClusterState.builder(new ClusterName(clusterName)).build(),
+                manifest,
+                manifest.getClusterUUID(),
+                localNodeId,
+                manifest.getIndices(),
+                manifest.getCustomMetadataMap(),
+                manifest.getCoordinationMetadata() != null,
+                manifest.getSettingsMetadata() != null,
+                manifest.getTransientSettingsMetadata() != null,
+                manifest.getTemplatesMetadata() != null,
+                includeEphemeral && manifest.getDiscoveryNodesMetadata() != null,
+                includeEphemeral && manifest.getClusterBlocksMetadata() != null,
+                includeEphemeral ? manifest.getIndicesRouting() : emptyList(),
+                includeEphemeral && manifest.getHashesOfConsistentSettings() != null,
+                includeEphemeral ? manifest.getClusterStateCustomMap() : emptyMap()
+            );
+        } else {
+            ClusterState clusterState = readClusterStateInParallel(
+                ClusterState.builder(new ClusterName(clusterName)).build(),
+                manifest,
+                manifest.getClusterUUID(),
+                localNodeId,
+                manifest.getIndices(),
+                // for manifest codec V1, we don't have the following objects to read, so not passing anything
+                emptyMap(),
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                emptyList(),
+                false,
+                emptyMap()
+            );
+            Metadata.Builder mb = Metadata.builder(remoteGlobalMetadataManager.getGlobalMetadata(manifest.getClusterUUID(), manifest));
+            mb.indices(clusterState.metadata().indices());
+            return ClusterState.builder(clusterState).metadata(mb).build();
+        }
+
     }
 
     public ClusterState getClusterStateUsingDiff(String clusterName, ClusterMetadataManifest manifest, ClusterState previousState, String localNodeId)
@@ -1413,7 +1442,7 @@ public class RemoteClusterStateService implements Closeable {
             // This can occur only when there are no valid cluster UUIDs
             assert validClusterManifests.isEmpty() : "There are no top level cluster UUIDs even when there are valid cluster UUIDs";
             logger.info("There is no valid previous cluster UUID. All cluster UUIDs evaluated are: {}", manifestsByClusterUUID.keySet());
-            return Collections.emptyList();
+            return emptyList();
         }
         if (topLevelClusterUUIDs.size() > 1) {
             logger.info("Top level cluster UUIDs: {}", topLevelClusterUUIDs);

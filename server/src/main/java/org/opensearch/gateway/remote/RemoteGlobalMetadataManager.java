@@ -195,31 +195,58 @@ public class RemoteGlobalMetadataManager {
                     compressor, namedXContentRegistry);
                 return globalMetadataBlobStore.read(remoteGlobalMetadata);
             } else if (clusterMetadataManifest.hasMetadataAttributesFiles()) {
-                CoordinationMetadata coordinationMetadata = getCoordinationMetadata(
-                    clusterUUID,
-                    clusterMetadataManifest.getCoordinationMetadata().getUploadedFilename()
-                );
-                Settings settingsMetadata = getSettingsMetadata(
-                    clusterUUID,
-                    clusterMetadataManifest.getSettingsMetadata().getUploadedFilename()
-                );
-                TemplatesMetadata templatesMetadata = getTemplatesMetadata(
-                    clusterUUID,
-                    clusterMetadataManifest.getTemplatesMetadata().getUploadedFilename()
-                );
                 Metadata.Builder builder = new Metadata.Builder();
-                builder.coordinationMetadata(coordinationMetadata);
-                builder.persistentSettings(settingsMetadata);
-                builder.templates(templatesMetadata);
+                if (clusterMetadataManifest.getCoordinationMetadata().getUploadedFilename() != null) {
+                    RemoteCoordinationMetadata remoteCoordinationMetadata = new RemoteCoordinationMetadata(
+                        clusterMetadataManifest.getCoordinationMetadata().getUploadedFilename(),
+                        clusterUUID,
+                        compressor,
+                        namedXContentRegistry
+                    );
+                    builder.coordinationMetadata(coordinationMetadataBlobStore.read(remoteCoordinationMetadata));
+                }
+                if (clusterMetadataManifest.getTemplatesMetadata().getUploadedFilename() != null) {
+                    RemoteTemplatesMetadata remoteTemplatesMetadata = new RemoteTemplatesMetadata(
+                        clusterMetadataManifest.getTemplatesMetadata().getUploadedFilename(),
+                        clusterUUID,
+                        compressor,
+                        namedXContentRegistry
+                    );
+                    builder.templates(templatesMetadataBlobStore.read(remoteTemplatesMetadata));
+                }
+                if (clusterMetadataManifest.getSettingsMetadata().getUploadedFilename() != null) {
+                    RemotePersistentSettingsMetadata remotePersistentSettingsMetadata = new RemotePersistentSettingsMetadata(
+                        clusterMetadataManifest.getSettingsMetadata().getUploadedFilename(),
+                        clusterUUID,
+                        compressor,
+                        namedXContentRegistry
+                    );
+                    builder.persistentSettings(persistentSettingsBlobStore.read(remotePersistentSettingsMetadata));
+                }
                 builder.clusterUUID(clusterMetadataManifest.getClusterUUID());
                 builder.clusterUUIDCommitted(clusterMetadataManifest.isClusterUUIDCommitted());
                 builder.version(clusterMetadataManifest.getMetadataVersion());
                 clusterMetadataManifest.getCustomMetadataMap()
                     .forEach(
-                        (key, value) -> builder.putCustom(
-                            key,
-                            getCustomsMetadata(clusterUUID, value.getUploadedFilename(), key)
-                        )
+                        (key, value) -> {
+                            try {
+                                builder.putCustom(
+                                    key,
+                                    customMetadataBlobStore.read(new RemoteCustomMetadata(
+                                        value.getUploadedFilename(),
+                                        key,
+                                        clusterUUID,
+                                        compressor,
+                                        namedXContentRegistry
+                                    ))
+                                );
+                            } catch (IOException e) {
+                                throw new IllegalStateException(
+                                    String.format(Locale.ROOT, "Error while downloading Custom Metadata - %s", value.getUploadedFilename()),
+                                    e
+                                );
+                            }
+                        }
                     );
                 return builder.build();
             } else {
@@ -228,74 +255,6 @@ public class RemoteGlobalMetadataManager {
         } catch (IOException e) {
             throw new IllegalStateException(
                 String.format(Locale.ROOT, "Error while downloading Global Metadata - %s", globalMetadataFileName),
-                e
-            );
-        }
-    }
-
-    public CoordinationMetadata getCoordinationMetadata(String clusterUUID, String coordinationMetadataFileName) {
-        try {
-            // Fetch Coordination metadata
-            if (coordinationMetadataFileName != null) {
-                RemoteCoordinationMetadata remoteCoordinationMetadata = new RemoteCoordinationMetadata(coordinationMetadataFileName, clusterUUID,
-                    compressor, namedXContentRegistry);
-                return coordinationMetadataBlobStore.read(remoteCoordinationMetadata);
-            } else {
-                return CoordinationMetadata.EMPTY_METADATA;
-            }
-        } catch (IOException e) {
-            throw new IllegalStateException(
-                String.format(Locale.ROOT, "Error while downloading Coordination Metadata - %s", coordinationMetadataFileName),
-                e
-            );
-        }
-    }
-
-    public Settings getSettingsMetadata(String clusterUUID, String settingsMetadataFileName) {
-        try {
-            // Fetch Settings metadata
-            if (settingsMetadataFileName != null) {
-                RemotePersistentSettingsMetadata remotePersistentSettingsMetadata = new RemotePersistentSettingsMetadata(settingsMetadataFileName, clusterUUID,
-                    compressor, namedXContentRegistry);
-                return persistentSettingsBlobStore.read(remotePersistentSettingsMetadata);
-            } else {
-                return Settings.EMPTY;
-            }
-        } catch (IOException e) {
-            throw new IllegalStateException(
-                String.format(Locale.ROOT, "Error while downloading Settings Metadata - %s", settingsMetadataFileName),
-                e
-            );
-        }
-    }
-
-    public TemplatesMetadata getTemplatesMetadata(String clusterUUID, String templatesMetadataFileName) {
-        try {
-            // Fetch Templates metadata
-            if (templatesMetadataFileName != null) {
-                RemoteTemplatesMetadata remoteTemplatesMetadata = new RemoteTemplatesMetadata(templatesMetadataFileName, clusterUUID,
-                    compressor, namedXContentRegistry);
-                return templatesMetadataBlobStore.read(remoteTemplatesMetadata);
-            } else {
-                return TemplatesMetadata.EMPTY_METADATA;
-            }
-        } catch (IOException e) {
-            throw new IllegalStateException(
-                String.format(Locale.ROOT, "Error while downloading Templates Metadata - %s", templatesMetadataFileName),
-                e
-            );
-        }
-    }
-
-    public Metadata.Custom getCustomsMetadata(String clusterUUID, String customMetadataFileName, String custom) {
-        requireNonNull(customMetadataFileName);
-        try {
-            // Fetch Custom metadata
-            RemoteCustomMetadata remoteCustomMetadata = new RemoteCustomMetadata(customMetadataFileName, custom, clusterUUID, compressor, namedXContentRegistry);
-            return customMetadataBlobStore.read(remoteCustomMetadata);
-        } catch (IOException e) {
-            throw new IllegalStateException(
-                String.format(Locale.ROOT, "Error while downloading Custom Metadata - %s", customMetadataFileName),
                 e
             );
         }
