@@ -9,6 +9,7 @@
 package org.opensearch.gateway.remote;
 
 import java.util.Objects;
+import java.util.concurrent.atomic.AtomicReference;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.apache.logging.log4j.message.ParameterizedMessage;
@@ -24,6 +25,7 @@ import org.opensearch.cluster.metadata.Metadata;
 import org.opensearch.cluster.metadata.Metadata.Custom;
 import org.opensearch.cluster.metadata.TemplatesMetadata;
 import org.opensearch.cluster.node.DiscoveryNodes;
+import org.opensearch.cluster.node.DiscoveryNodes.Builder;
 import org.opensearch.cluster.routing.IndexRoutingTable;
 import org.opensearch.cluster.routing.RoutingTable;
 import org.opensearch.cluster.routing.remote.InternalRemoteRoutingTableService;
@@ -89,15 +91,21 @@ import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 import static org.opensearch.gateway.PersistedClusterStateService.SLOW_WRITE_LOGGING_THRESHOLD;
+import static org.opensearch.gateway.remote.RemoteClusterStateAttributesManager.CLUSTER_BLOCKS;
+import static org.opensearch.gateway.remote.RemoteClusterStateAttributesManager.CLUSTER_STATE_ATTRIBUTE;
+import static org.opensearch.gateway.remote.RemoteClusterStateAttributesManager.DISCOVERY_NODES;
 import static org.opensearch.gateway.remote.RemoteClusterStateUtils.DELIMITER;
 import static org.opensearch.gateway.remote.RemoteClusterStateUtils.UploadedMetadataResults;
 import static org.opensearch.gateway.remote.RemoteClusterStateUtils.clusterUUIDContainer;
 import static org.opensearch.gateway.remote.RemoteClusterStateUtils.getClusterMetadataBasePath;
+import static org.opensearch.gateway.remote.model.RemoteClusterStateCustoms.CLUSTER_STATE_CUSTOM;
 import static org.opensearch.gateway.remote.model.RemoteCoordinationMetadata.COORDINATION_METADATA;
 import static org.opensearch.gateway.remote.model.RemoteCustomMetadata.CUSTOM_DELIMITER;
 import static org.opensearch.gateway.remote.model.RemoteCustomMetadata.CUSTOM_METADATA;
+import static org.opensearch.gateway.remote.model.RemoteHashesOfConsistentSettings.HASHES_OF_CONSISTENT_SETTINGS;
 import static org.opensearch.gateway.remote.model.RemotePersistentSettingsMetadata.SETTING_METADATA;
 import static org.opensearch.gateway.remote.model.RemoteTemplatesMetadata.TEMPLATES_METADATA;
+import static org.opensearch.gateway.remote.model.RemoteTransientSettingsMetadata.TRANSIENT_SETTING_METADATA;
 import static org.opensearch.node.remotestore.RemoteStoreNodeAttribute.isRemoteStoreClusterStateEnabled;
 
 /**
@@ -536,11 +544,14 @@ public class RemoteClusterStateService implements Closeable {
             uploadTasks.put(
                 TRANSIENT_SETTING_METADATA,
                 remoteGlobalMetadataManager.getAsyncMetadataWriteAction(
-                    clusterState.metadata().transientSettings(),
-                    clusterState.metadata().version(),
-                    clusterState.metadata().clusterUUID(),
-                    listener,
-                    TRANSIENT_SETTING_METADATA
+                    new RemoteTransientSettingsMetadata(
+                        clusterState.metadata().transientSettings(),
+                        clusterState.metadata().version(),
+                        clusterState.metadata().clusterUUID(),
+                        blobStoreRepository.getCompressor(),
+                        blobStoreRepository.getNamedXContentRegistry()
+                    ),
+                    listener
                 )
             );
         }
@@ -578,9 +589,12 @@ public class RemoteClusterStateService implements Closeable {
             uploadTasks.put(
                 DISCOVERY_NODES,
                 remoteClusterStateAttributesManager.getAsyncMetadataWriteAction(
-                    clusterState,
-                    DISCOVERY_NODES,
-                    clusterState.nodes(),
+                    new RemoteDiscoveryNodes(
+                        clusterState.nodes(),
+                        clusterState.version(),
+                        clusterState.stateUUID(),
+                        blobStoreRepository.getCompressor()
+                    ),
                     listener
                 )
             );
@@ -589,9 +603,12 @@ public class RemoteClusterStateService implements Closeable {
             uploadTasks.put(
                 CLUSTER_BLOCKS,
                 remoteClusterStateAttributesManager.getAsyncMetadataWriteAction(
-                    clusterState,
-                    CLUSTER_BLOCKS,
-                    clusterState.blocks(),
+                    new RemoteClusterBlocks(
+                        clusterState.blocks(),
+                        clusterState.version(),
+                        clusterState.metadata().clusterUUID(),
+                        blobStoreRepository.getCompressor()
+                    ),
                     listener
                 )
             );
@@ -600,11 +617,13 @@ public class RemoteClusterStateService implements Closeable {
             uploadTasks.put(
                 HASHES_OF_CONSISTENT_SETTINGS,
                 remoteGlobalMetadataManager.getAsyncMetadataWriteAction(
-                    clusterState.metadata().hashesOfConsistentSettings(),
-                    clusterState.metadata().version(),
-                    clusterState.metadata().clusterUUID(),
-                    listener,
-                    null
+                    new RemoteHashesOfConsistentSettings(
+                        clusterState.metadata().hashesOfConsistentSettings(),
+                        clusterState.metadata().version(),
+                        clusterState.metadata().clusterUUID(),
+                        blobStoreRepository.getCompressor()
+                    ),
+                    listener
                 )
             );
         }
@@ -728,13 +747,13 @@ public class RemoteClusterStateService implements Closeable {
                 response.uploadedTemplatesMetadata = (UploadedMetadataAttribute) uploadedMetadata;
             } else if (name.contains(UploadedIndexMetadata.COMPONENT_PREFIX)) {
                 response.uploadedIndexMetadata.add((UploadedIndexMetadata) uploadedMetadata);
-            } else if (RemoteTransientSettingsMetadata.TRANSIENT_SETTING_METADATA.equals(name)) {
+            } else if (TRANSIENT_SETTING_METADATA.equals(name)) {
                 response.uploadedTransientSettingsMetadata = (UploadedMetadataAttribute) uploadedMetadata;
             } else if (RemoteDiscoveryNodes.DISCOVERY_NODES.equals(uploadedMetadata.getComponent())) {
                 response.uploadedDiscoveryNodes = (UploadedMetadataAttribute) uploadedMetadata;
             } else if (RemoteClusterBlocks.CLUSTER_BLOCKS.equals(uploadedMetadata.getComponent())) {
                 response.uploadedClusterBlocks = (UploadedMetadataAttribute) uploadedMetadata;
-            } else if (RemoteHashesOfConsistentSettings.HASHES_OF_CONSISTENT_SETTINGS.equals(uploadedMetadata.getComponent())) {
+            } else if (HASHES_OF_CONSISTENT_SETTINGS.equals(uploadedMetadata.getComponent())) {
                 response.uploadedHashesOfConsistentSettings = (UploadedMetadataAttribute) uploadedMetadata;
             } else {
                 throw new IllegalStateException("Unexpected metadata component " + uploadedMetadata.getComponent());
@@ -1217,8 +1236,8 @@ public class RemoteClusterStateService implements Closeable {
             throw exception;
         }
 
-        ClusterState.Builder clusterStateBuilder = ClusterState.builder(previousState);
-        AtomicReference<DiscoveryNodes.Builder> discoveryNodesBuilder = new AtomicReference<>(DiscoveryNodes.builder());
+        final ClusterState.Builder clusterStateBuilder = ClusterState.builder(previousState);
+        AtomicReference<Builder> discoveryNodesBuilder = new AtomicReference<>(DiscoveryNodes.builder());
         Metadata.Builder metadataBuilder = Metadata.builder(previousState.metadata());
         metadataBuilder.version(manifest.getMetadataVersion());
         metadataBuilder.clusterUUID(manifest.getClusterUUID());
@@ -1228,7 +1247,7 @@ public class RemoteClusterStateService implements Closeable {
 
         readResults.forEach(remoteReadResult -> {
             switch (remoteReadResult.getComponent()) {
-                case INDEX_PATH_TOKEN:
+                case RemoteIndexMetadata.INDEX:
                     IndexMetadata indexMetadata = (IndexMetadata) remoteReadResult.getObj();
                     indexMetadataMap.put(indexMetadata.getIndex().getName(), indexMetadata);
                     break;
