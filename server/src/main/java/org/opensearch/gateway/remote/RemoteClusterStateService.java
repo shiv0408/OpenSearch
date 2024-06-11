@@ -8,8 +8,43 @@
 
 package org.opensearch.gateway.remote;
 
+import static org.opensearch.gateway.PersistedClusterStateService.SLOW_WRITE_LOGGING_THRESHOLD;
+import static org.opensearch.gateway.remote.RemoteClusterStateAttributesManager.CLUSTER_BLOCKS;
+import static org.opensearch.gateway.remote.RemoteClusterStateAttributesManager.CLUSTER_STATE_ATTRIBUTE;
+import static org.opensearch.gateway.remote.RemoteClusterStateAttributesManager.DISCOVERY_NODES;
+import static org.opensearch.gateway.remote.RemoteClusterStateUtils.DELIMITER;
+import static org.opensearch.gateway.remote.RemoteClusterStateUtils.UploadedMetadataResults;
+import static org.opensearch.gateway.remote.RemoteClusterStateUtils.clusterUUIDContainer;
+import static org.opensearch.gateway.remote.RemoteClusterStateUtils.getClusterMetadataBasePath;
+import static org.opensearch.gateway.remote.model.RemoteClusterStateCustoms.CLUSTER_STATE_CUSTOM;
+import static org.opensearch.gateway.remote.model.RemoteCoordinationMetadata.COORDINATION_METADATA;
+import static org.opensearch.gateway.remote.model.RemoteCustomMetadata.CUSTOM_DELIMITER;
+import static org.opensearch.gateway.remote.model.RemoteCustomMetadata.CUSTOM_METADATA;
+import static org.opensearch.gateway.remote.model.RemoteHashesOfConsistentSettings.HASHES_OF_CONSISTENT_SETTINGS;
+import static org.opensearch.gateway.remote.model.RemotePersistentSettingsMetadata.SETTING_METADATA;
+import static org.opensearch.gateway.remote.model.RemoteTemplatesMetadata.TEMPLATES_METADATA;
+import static org.opensearch.gateway.remote.model.RemoteTransientSettingsMetadata.TRANSIENT_SETTING_METADATA;
+import static org.opensearch.node.remotestore.RemoteStoreNodeAttribute.isRemoteStoreClusterStateEnabled;
+
+import java.io.Closeable;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Function;
+import java.util.function.LongSupplier;
+import java.util.function.Supplier;
+import java.util.stream.Collectors;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.apache.logging.log4j.message.ParameterizedMessage;
@@ -22,7 +57,6 @@ import org.opensearch.cluster.coordination.CoordinationMetadata;
 import org.opensearch.cluster.metadata.DiffableStringMap;
 import org.opensearch.cluster.metadata.IndexMetadata;
 import org.opensearch.cluster.metadata.Metadata;
-import org.opensearch.cluster.metadata.Metadata.Custom;
 import org.opensearch.cluster.metadata.TemplatesMetadata;
 import org.opensearch.cluster.node.DiscoveryNodes;
 import org.opensearch.cluster.node.DiscoveryNodes.Builder;
@@ -49,21 +83,17 @@ import org.opensearch.core.xcontent.ToXContent;
 import org.opensearch.gateway.remote.ClusterMetadataManifest.UploadedIndexMetadata;
 import org.opensearch.gateway.remote.ClusterMetadataManifest.UploadedMetadataAttribute;
 import org.opensearch.gateway.remote.model.RemoteClusterBlocks;
-import org.opensearch.gateway.remote.model.RemoteClusterMetadataManifest;
 import org.opensearch.gateway.remote.model.RemoteClusterStateCustoms;
 import org.opensearch.gateway.remote.model.RemoteClusterStateManifestInfo;
 import org.opensearch.gateway.remote.model.RemoteCoordinationMetadata;
 import org.opensearch.gateway.remote.model.RemoteCustomMetadata;
 import org.opensearch.gateway.remote.model.RemoteDiscoveryNodes;
-import org.opensearch.gateway.remote.model.RemoteGlobalMetadata;
 import org.opensearch.gateway.remote.model.RemoteHashesOfConsistentSettings;
 import org.opensearch.gateway.remote.model.RemoteIndexMetadata;
 import org.opensearch.gateway.remote.model.RemotePersistentSettingsMetadata;
 import org.opensearch.gateway.remote.model.RemoteReadResult;
 import org.opensearch.gateway.remote.model.RemoteTemplatesMetadata;
 import org.opensearch.gateway.remote.model.RemoteTransientSettingsMetadata;
-import org.opensearch.gateway.remote.model.RemoteClusterStateBlobStore;
-import org.opensearch.common.remote.RemoteWritableEntityStore;
 import org.opensearch.index.translog.transfer.BlobStoreTransferService;
 import org.opensearch.node.Node;
 import org.opensearch.node.remotestore.RemoteStoreNodeAttribute;
@@ -71,42 +101,6 @@ import org.opensearch.repositories.RepositoriesService;
 import org.opensearch.repositories.Repository;
 import org.opensearch.repositories.blobstore.BlobStoreRepository;
 import org.opensearch.threadpool.ThreadPool;
-
-import java.io.Closeable;
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
-import java.util.Optional;
-import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
-import java.util.function.Function;
-import java.util.function.LongSupplier;
-import java.util.function.Supplier;
-import java.util.stream.Collectors;
-
-import static org.opensearch.gateway.PersistedClusterStateService.SLOW_WRITE_LOGGING_THRESHOLD;
-import static org.opensearch.gateway.remote.RemoteClusterStateAttributesManager.CLUSTER_BLOCKS;
-import static org.opensearch.gateway.remote.RemoteClusterStateAttributesManager.CLUSTER_STATE_ATTRIBUTE;
-import static org.opensearch.gateway.remote.RemoteClusterStateAttributesManager.DISCOVERY_NODES;
-import static org.opensearch.gateway.remote.RemoteClusterStateUtils.DELIMITER;
-import static org.opensearch.gateway.remote.RemoteClusterStateUtils.UploadedMetadataResults;
-import static org.opensearch.gateway.remote.RemoteClusterStateUtils.clusterUUIDContainer;
-import static org.opensearch.gateway.remote.RemoteClusterStateUtils.getClusterMetadataBasePath;
-import static org.opensearch.gateway.remote.model.RemoteClusterStateCustoms.CLUSTER_STATE_CUSTOM;
-import static org.opensearch.gateway.remote.model.RemoteCoordinationMetadata.COORDINATION_METADATA;
-import static org.opensearch.gateway.remote.model.RemoteCustomMetadata.CUSTOM_DELIMITER;
-import static org.opensearch.gateway.remote.model.RemoteCustomMetadata.CUSTOM_METADATA;
-import static org.opensearch.gateway.remote.model.RemoteHashesOfConsistentSettings.HASHES_OF_CONSISTENT_SETTINGS;
-import static org.opensearch.gateway.remote.model.RemotePersistentSettingsMetadata.SETTING_METADATA;
-import static org.opensearch.gateway.remote.model.RemoteTemplatesMetadata.TEMPLATES_METADATA;
-import static org.opensearch.gateway.remote.model.RemoteTransientSettingsMetadata.TRANSIENT_SETTING_METADATA;
-import static org.opensearch.node.remotestore.RemoteStoreNodeAttribute.isRemoteStoreClusterStateEnabled;
 
 /**
  * A Service which provides APIs to upload and download cluster metadata from remote store.
@@ -640,7 +634,7 @@ public class RemoteClusterStateService implements Closeable {
                         clusterState.metadata().version(),
                         clusterState.metadata().clusterUUID(),
                         blobStoreRepository.getCompressor(),
-                        blobStoreRepository.getNamedXContentRegistry()
+                        namedWriteableRegistry
                     ),
                     listener
                 )
@@ -904,61 +898,22 @@ public class RemoteClusterStateService implements Closeable {
         this.remoteRoutingTableService.start();
         blobStoreTransferService = new BlobStoreTransferService(getBlobStore(), threadpool);
         String clusterName = ClusterName.CLUSTER_NAME_SETTING.get(settings).value();
-        RemoteWritableEntityStore<Metadata, RemoteGlobalMetadata> globalMetadataBlobStore = new RemoteClusterStateBlobStore<>(
-            getBlobStoreTransferService(),
-            blobStoreRepository,
-            clusterName,
-            threadpool,
-            ThreadPool.Names.GENERIC
-        );
-        RemoteClusterStateBlobStore<CoordinationMetadata, RemoteCoordinationMetadata> coordinationMetadataBlobStore =
-            new RemoteClusterStateBlobStore<>(
-                getBlobStoreTransferService(),
-                blobStoreRepository,
-                clusterName,
-                threadpool,
-                ThreadPool.Names.GENERIC
-            );
-        RemoteClusterStateBlobStore<Settings, RemotePersistentSettingsMetadata> persistentSettingsBlobStore =
-            new RemoteClusterStateBlobStore<>(
-                getBlobStoreTransferService(),
-                blobStoreRepository,
-                clusterName,
-                threadpool,
-                ThreadPool.Names.GENERIC
-            );
-        RemoteClusterStateBlobStore<TemplatesMetadata, RemoteTemplatesMetadata> templatesMetadataBlobStore =
-            new RemoteClusterStateBlobStore<>(
-                getBlobStoreTransferService(),
-                blobStoreRepository,
-                clusterName,
-                threadpool,
-                ThreadPool.Names.GENERIC
-            );
-        RemoteClusterStateBlobStore<Custom, RemoteCustomMetadata> customMetadataBlobStore = new RemoteClusterStateBlobStore<>(
-            getBlobStoreTransferService(),
-            blobStoreRepository,
-            clusterName,
-            threadpool,
-            ThreadPool.Names.GENERIC
-        );
-        RemoteClusterStateBlobStore<Settings, RemoteTransientSettingsMetadata> transientSettingsBlobStore =
-            new RemoteClusterStateBlobStore<>(
-                getBlobStoreTransferService(),
-                blobStoreRepository,
-                clusterName,
-                threadpool,
-                ThreadPool.Names.GENERIC
-            );
-        RemoteClusterStateBlobStore<DiffableStringMap, RemoteHashesOfConsistentSettings> hashesOfConsistentSettingsBlobStore =
-            new RemoteClusterStateBlobStore<>(
-                getBlobStoreTransferService(),
-                blobStoreRepository,
-                clusterName,
-                threadpool,
-                ThreadPool.Names.GENERIC
-            );
         remoteGlobalMetadataManager = new RemoteGlobalMetadataManager(
+            clusterSettings,
+            clusterName,
+            blobStoreRepository,
+            getBlobStoreTransferService(),
+            namedWriteableRegistry,
+            threadpool
+        );
+        remoteClusterStateAttributesManager = new RemoteClusterStateAttributesManager(
+            clusterName,
+            blobStoreRepository,
+            getBlobStoreTransferService(),
+            namedWriteableRegistry,
+            threadpool
+        );
+        remoteIndexMetadataManager = new RemoteIndexMetadataManager(
             clusterSettings,
             clusterName,
             blobStoreRepository,
@@ -1095,7 +1050,7 @@ public class RemoteClusterStateService implements Closeable {
                         entry.getKey(),
                         clusterUUID,
                         blobStoreRepository.getCompressor(),
-                        blobStoreRepository.getNamedXContentRegistry()
+                        namedWriteableRegistry
                     ),
                     entry.getValue().getAttributeName(),
                     listener

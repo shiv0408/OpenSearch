@@ -30,6 +30,7 @@ import org.opensearch.common.settings.Setting;
 import org.opensearch.common.settings.Settings;
 import org.opensearch.common.unit.TimeValue;
 import org.opensearch.core.action.ActionListener;
+import org.opensearch.core.common.io.stream.NamedWriteableRegistry;
 import org.opensearch.core.compress.Compressor;
 import org.opensearch.core.xcontent.NamedXContentRegistry;
 import org.opensearch.core.xcontent.ToXContent;
@@ -68,17 +69,20 @@ public class RemoteGlobalMetadataManager {
     private Map<String, RemoteWritableEntityStore> remoteWritableEntityStores;
     private final Compressor compressor;
     private final NamedXContentRegistry namedXContentRegistry;
+    private final NamedWriteableRegistry namedWriteableRegistry;
 
     RemoteGlobalMetadataManager(
         ClusterSettings clusterSettings,
         String clusterName,
         BlobStoreRepository blobStoreRepository,
         BlobStoreTransferService blobStoreTransferService,
+        NamedWriteableRegistry namedWriteableRegistry,
         ThreadPool threadpool
     ) {
         this.globalMetadataUploadTimeout = clusterSettings.get(GLOBAL_METADATA_UPLOAD_TIMEOUT_SETTING);
         this.compressor = blobStoreRepository.getCompressor();
         this.namedXContentRegistry = blobStoreRepository.getNamedXContentRegistry();
+        this.namedWriteableRegistry = namedWriteableRegistry;
         this.remoteWritableEntityStores = new HashMap<>();
         this.remoteWritableEntityStores.put(
             RemoteGlobalMetadata.GLOBAL_METADATA,
@@ -246,7 +250,7 @@ public class RemoteGlobalMetadataManager {
                             key,
                             clusterUUID,
                             compressor,
-                            namedXContentRegistry
+                            namedWriteableRegistry
                         );
                         builder.putCustom(key, (Custom) getStore(remoteCustomMetadata).read(remoteCustomMetadata));
                     } catch (IOException e) {

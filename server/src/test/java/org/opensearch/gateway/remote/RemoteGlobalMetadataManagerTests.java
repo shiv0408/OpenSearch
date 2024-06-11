@@ -56,50 +56,6 @@ public class RemoteGlobalMetadataManagerTests extends OpenSearchTestCase {
         clusterSettings = new ClusterSettings(Settings.EMPTY, ClusterSettings.BUILT_IN_CLUSTER_SETTINGS);
         blobStoreRepository = mock(BlobStoreRepository.class);
         BlobStoreTransferService blobStoreTransferService = mock(BlobStoreTransferService.class);
-        RemoteClusterStateBlobStore<Metadata, RemoteGlobalMetadata> remoteGlobalMetadataStore = new RemoteClusterStateBlobStore<>(
-            blobStoreTransferService,
-            blobStoreRepository,
-            "test-cluster",
-            threadPool,
-            "test"
-        );
-        RemoteClusterStateBlobStore<CoordinationMetadata, RemoteCoordinationMetadata> remoteCoordinationStore =
-            new RemoteClusterStateBlobStore<>(blobStoreTransferService, blobStoreRepository, "test-cluster", threadPool, "test");
-        RemoteClusterStateBlobStore<Settings, RemotePersistentSettingsMetadata> remoteSettingStore = new RemoteClusterStateBlobStore<>(
-            blobStoreTransferService,
-            blobStoreRepository,
-            "test-cluster",
-            threadPool,
-            "test"
-        );
-        RemoteClusterStateBlobStore<TemplatesMetadata, RemoteTemplatesMetadata> remoteTemplateStore = new RemoteClusterStateBlobStore<>(
-            blobStoreTransferService,
-            blobStoreRepository,
-            "test-cluster",
-            threadPool,
-            "test"
-        );
-        RemoteClusterStateBlobStore<Metadata.Custom, RemoteCustomMetadata> remoteCustomStore = new RemoteClusterStateBlobStore<>(
-            blobStoreTransferService,
-            blobStoreRepository,
-            "test-cluster",
-            threadPool,
-            "test"
-        );
-        RemoteClusterStateBlobStore<Settings, RemoteTransientSettingsMetadata> remoteTransientSettingsStore = new RemoteClusterStateBlobStore<>(
-            blobStoreTransferService,
-            blobStoreRepository,
-            "test-cluster",
-            threadPool,
-            "test"
-        );
-        RemoteClusterStateBlobStore<DiffableStringMap, RemoteHashesOfConsistentSettings> remoteHashesOfConsistentSettingsStore = new RemoteClusterStateBlobStore<>(
-            blobStoreTransferService,
-            blobStoreRepository,
-            "test-cluster",
-            threadPool,
-            "test"
-        );
         NamedXContentRegistry xContentRegistry = new NamedXContentRegistry(
             Stream.of(
                 NetworkModule.getNamedXContents().stream(),
@@ -115,6 +71,7 @@ public class RemoteGlobalMetadataManagerTests extends OpenSearchTestCase {
             "test-cluster",
             blobStoreRepository,
             blobStoreTransferService,
+            writableRegistry(),
             threadPool
         );
     }
