@@ -26,7 +26,6 @@ import org.opensearch.cluster.metadata.TemplatesMetadata;
 import org.opensearch.cluster.node.DiscoveryNodes;
 import org.opensearch.cluster.routing.IndexRoutingTable;
 import org.opensearch.cluster.routing.RoutingTable;
-import org.opensearch.cluster.routing.IndexRoutingTable;
 import org.opensearch.cluster.routing.remote.InternalRemoteRoutingTableService;
 import org.opensearch.cluster.routing.remote.RemoteRoutingTableService;
 import org.opensearch.cluster.routing.remote.RemoteRoutingTableServiceFactory;
@@ -35,7 +34,6 @@ import org.opensearch.common.CheckedRunnable;
 import org.opensearch.common.Nullable;
 import org.opensearch.common.blobstore.BlobContainer;
 import org.opensearch.common.blobstore.BlobStore;
-import org.opensearch.common.collect.Tuple;
 import org.opensearch.common.settings.ClusterSettings;
 import org.opensearch.common.settings.Setting;
 import org.opensearch.common.settings.Setting.Property;
@@ -80,7 +78,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -192,7 +189,7 @@ public class RemoteClusterStateService implements Closeable {
         this.namedWriteableRegistry = namedWriteableRegistry;
         this.remoteClusterStateCleanupManager = new RemoteClusterStateCleanupManager(this, clusterService);
         this.indexMetadataUploadListeners = indexMetadataUploadListeners;
-        this.remoteRoutingTableService = RemoteRoutingTableServiceFactory.getService(repositoriesService, settings, clusterSettings);
+        this.remoteRoutingTableService = RemoteRoutingTableServiceFactory.getService(repositoriesService, settings, clusterSettings, threadPool);
     }
 
     /**
@@ -1081,16 +1078,14 @@ public class RemoteClusterStateService implements Closeable {
             latch
         );
 
-        if(remoteRoutingTableService.isPresent()) {
-            for (UploadedIndexMetadata indexRouting : indicesRoutingToRead) {
-                asyncMetadataReadActions.add(
-                    remoteRoutingTableService.get().getAsyncIndexMetadataReadAction(
-                        indexRouting.getUploadedFilename(),
-                        new Index(indexRouting.getIndexName(), indexRouting.getIndexUUID()),
-                        routingTableLatchedActionListener
-                    )
-                );
-            }
+        for (UploadedIndexMetadata indexRouting : indicesRoutingToRead) {
+            asyncMetadataReadActions.add(
+                remoteRoutingTableService.getAsyncIndexRoutingReadAction(
+                    indexRouting.getUploadedFilename(),
+                    new Index(indexRouting.getIndexName(), indexRouting.getIndexUUID()),
+                    routingTableLatchedActionListener
+                )
+            );
         }
 
         for (Map.Entry<String, UploadedMetadataAttribute> entry : customToRead.entrySet()) {
@@ -1284,10 +1279,9 @@ public class RemoteClusterStateService implements Closeable {
             .version(manifest.getStateVersion())
             .stateUUID(manifest.getStateUUID());
 
-        if(remoteRoutingTableService.isPresent()) {
-            readIndexRoutingTableResults.forEach(indexRoutingTable -> indicesRouting.put(indexRoutingTable.getIndex().getName(), indexRoutingTable));
-            clusterStateBuilder = clusterStateBuilder.routingTable(new RoutingTable(manifest.getRoutingTableVersion(), indicesRouting));
-        }
+        readIndexRoutingTableResults.forEach(indexRoutingTable -> indicesRouting.put(indexRoutingTable.getIndex().getName(), indexRoutingTable));
+        clusterStateBuilder = clusterStateBuilder.routingTable(new RoutingTable(manifest.getRoutingTableVersion(), indicesRouting));
+
         return clusterStateBuilder.build();
     }
 
@@ -1337,10 +1331,8 @@ public class RemoteClusterStateService implements Closeable {
         }
 
         List<UploadedIndexMetadata> updatedIndexRouting = new ArrayList<>();
-        remoteRoutingTableService.ifPresent(routingTableService ->
-                updatedIndexRouting.addAll(routingTableService.getUpdatedIndexRoutingTableMetadata(diff.getIndicesRoutingUpdated(),
-                        manifest.getIndicesRouting()))
-        );
+        updatedIndexRouting.addAll(remoteRoutingTableService.getUpdatedIndexRoutingTableMetadata(diff.getIndicesRoutingUpdated(),
+                        manifest.getIndicesRouting()));
 
         ClusterState updatedClusterState = readClusterStateInParallel(
             previousState,
