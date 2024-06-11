@@ -531,7 +531,6 @@ public class RemoteClusterStateService implements Closeable {
                         blobStoreRepository.getCompressor(),
                         blobStoreRepository.getNamedXContentRegistry()
                     ),
-                    remoteGlobalMetadataManager.getPersistentSettingsBlobStore(),
                     listener
                 )
             );
@@ -559,7 +558,6 @@ public class RemoteClusterStateService implements Closeable {
                         blobStoreRepository.getCompressor(),
                         blobStoreRepository.getNamedXContentRegistry()
                     ),
-                    remoteGlobalMetadataManager.getCoordinationMetadataBlobStore(),
                     listener
                 )
             );
@@ -575,7 +573,6 @@ public class RemoteClusterStateService implements Closeable {
                         blobStoreRepository.getCompressor(),
                         blobStoreRepository.getNamedXContentRegistry()
                     ),
-                    remoteGlobalMetadataManager.getTemplatesMetadataBlobStore(),
                     listener
                 )
             );
@@ -627,7 +624,6 @@ public class RemoteClusterStateService implements Closeable {
                         blobStoreRepository.getCompressor(),
                         blobStoreRepository.getNamedXContentRegistry()
                     ),
-                    remoteGlobalMetadataManager.getCustomMetadataBlobStore(),
                     listener
                 )
             );
