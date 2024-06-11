@@ -16,6 +16,8 @@ import org.opensearch.repositories.fs.FsRepository;
 import org.opensearch.test.OpenSearchTestCase;
 
 import java.util.function.Supplier;
+import org.opensearch.threadpool.TestThreadPool;
+import org.opensearch.threadpool.ThreadPool;
 
 import static org.opensearch.common.util.FeatureFlags.REMOTE_PUBLICATION_EXPERIMENTAL;
 import static org.opensearch.node.remotestore.RemoteStoreNodeAttribute.REMOTE_STORE_ROUTING_TABLE_REPOSITORY_NAME_ATTRIBUTE_KEY;
@@ -23,13 +25,15 @@ import static org.opensearch.node.remotestore.RemoteStoreNodeAttribute.REMOTE_ST
 public class RemoteRoutingTableServiceFactoryTests extends OpenSearchTestCase {
 
     Supplier<RepositoriesService> repositoriesService;
+    private ThreadPool threadPool = new TestThreadPool(getClass().getName());
 
     public void testGetServiceWhenRemoteRoutingDisabled() {
         Settings settings = Settings.builder().build();
         RemoteRoutingTableService service = RemoteRoutingTableServiceFactory.getService(
             repositoriesService,
             settings,
-            new ClusterSettings(settings, ClusterSettings.BUILT_IN_CLUSTER_SETTINGS)
+            new ClusterSettings(settings, ClusterSettings.BUILT_IN_CLUSTER_SETTINGS),
+            threadPool
         );
         assertTrue(service instanceof NoopRemoteRoutingTableService);
     }
@@ -44,7 +48,8 @@ public class RemoteRoutingTableServiceFactoryTests extends OpenSearchTestCase {
         RemoteRoutingTableService service = RemoteRoutingTableServiceFactory.getService(
             repositoriesService,
             settings,
-            new ClusterSettings(settings, ClusterSettings.BUILT_IN_CLUSTER_SETTINGS)
+            new ClusterSettings(settings, ClusterSettings.BUILT_IN_CLUSTER_SETTINGS),
+            threadPool
         );
         assertTrue(service instanceof InternalRemoteRoutingTableService);
     }

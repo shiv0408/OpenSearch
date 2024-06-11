@@ -8,10 +8,17 @@
 
 package org.opensearch.gateway.remote;
 
+import static org.opensearch.gateway.remote.RemoteClusterStateUtils.METADATA_NAME_FORMAT;
+
+import java.io.IOException;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
 import org.opensearch.action.LatchedActionListener;
 import org.opensearch.cluster.ClusterState;
 import org.opensearch.cluster.coordination.CoordinationMetadata;
-import org.opensearch.cluster.metadata.DiffableStringMap;
 import org.opensearch.cluster.metadata.Metadata;
 import org.opensearch.cluster.metadata.Metadata.Custom;
 import org.opensearch.cluster.metadata.TemplatesMetadata;
@@ -25,6 +32,7 @@ import org.opensearch.common.unit.TimeValue;
 import org.opensearch.core.action.ActionListener;
 import org.opensearch.core.compress.Compressor;
 import org.opensearch.core.xcontent.NamedXContentRegistry;
+import org.opensearch.core.xcontent.ToXContent;
 import org.opensearch.gateway.remote.model.RemoteClusterStateBlobStore;
 import org.opensearch.gateway.remote.model.RemoteCoordinationMetadata;
 import org.opensearch.gateway.remote.model.RemoteCustomMetadata;
@@ -37,15 +45,6 @@ import org.opensearch.gateway.remote.model.RemoteTransientSettingsMetadata;
 import org.opensearch.index.translog.transfer.BlobStoreTransferService;
 import org.opensearch.repositories.blobstore.BlobStoreRepository;
 import org.opensearch.threadpool.ThreadPool;
-
-import java.io.IOException;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Locale;
-import java.util.Map;
-import java.util.Set;
-
-import static org.opensearch.gateway.remote.RemoteClusterStateUtils.METADATA_NAME_FORMAT;
 
 /**
  * A Manager which provides APIs to write and read Global Metadata attributes to remote store
@@ -112,6 +111,26 @@ public class RemoteGlobalMetadataManager {
             )
         );
         this.remoteWritableEntityStores.put(
+            RemoteTransientSettingsMetadata.TRANSIENT_SETTING_METADATA,
+            new RemoteClusterStateBlobStore<>(
+                blobStoreTransferService,
+                blobStoreRepository,
+                clusterName,
+                threadpool,
+                ThreadPool.Names.REMOTE_STATE_READ
+            )
+        );
+        this.remoteWritableEntityStores.put(
+            RemoteHashesOfConsistentSettings.HASHES_OF_CONSISTENT_SETTINGS,
+            new RemoteClusterStateBlobStore<>(
+                blobStoreTransferService,
+                blobStoreRepository,
+                clusterName,
+                threadpool,
+                ThreadPool.Names.REMOTE_STATE_READ
+            )
+        );
+        this.remoteWritableEntityStores.put(
             RemoteTemplatesMetadata.TEMPLATES_METADATA,
             new RemoteClusterStateBlobStore<>(
                 blobStoreTransferService,
@@ -163,36 +182,13 @@ public class RemoteGlobalMetadataManager {
     }
 
     CheckedRunnable<IOException> getAsyncMetadataReadAction(
-        String clusterUUID,
-        String component,
+        AbstractRemoteWritableBlobEntity readEntity,
         String componentName,
-        String uploadFilename,
         LatchedActionListener<RemoteReadResult> listener
     ) {
         ActionListener actionListener = ActionListener.wrap(
-            response -> listener.onResponse(new RemoteReadResult((ToXContent) response, component, componentName)), listener::onFailure);
-        if (component.equals(RemoteCoordinationMetadata.COORDINATION_METADATA)) {
-            RemoteCoordinationMetadata remoteBlobStoreObject = new RemoteCoordinationMetadata(uploadFilename, clusterUUID, compressor, namedXContentRegistry);
-            return () -> coordinationMetadataBlobStore.readAsync(remoteBlobStoreObject, actionListener);
-        } else if (component.equals(RemoteTemplatesMetadata.TEMPLATES_METADATA)) {
-            RemoteTemplatesMetadata remoteBlobStoreObject = new RemoteTemplatesMetadata(uploadFilename, clusterUUID, compressor, namedXContentRegistry);
-            return () -> templatesMetadataBlobStore.readAsync(remoteBlobStoreObject, actionListener);
-        } else if (component.equals(RemotePersistentSettingsMetadata.SETTING_METADATA)) {
-            RemotePersistentSettingsMetadata remoteBlobStoreObject = new RemotePersistentSettingsMetadata(uploadFilename, clusterUUID, compressor, namedXContentRegistry);
-            return () -> persistentSettingsBlobStore.readAsync(remoteBlobStoreObject, actionListener);
-        } else if (component.equals(RemoteTransientSettingsMetadata.TRANSIENT_SETTING_METADATA)) {
-            RemoteTransientSettingsMetadata remoteBlobStoreObject = new RemoteTransientSettingsMetadata(uploadFilename, clusterUUID,
-                compressor, namedXContentRegistry);
-            return () -> transientSettingsBlobStore.readAsync(remoteBlobStoreObject, actionListener);
-        } else if (component.equals(RemoteCustomMetadata.CUSTOM_METADATA)) {
-            RemoteCustomMetadata remoteBlobStoreObject = new RemoteCustomMetadata(uploadFilename, componentName, clusterUUID, compressor, namedXContentRegistry);
-            return () -> customMetadataBlobStore.readAsync(remoteBlobStoreObject, actionListener);
-        } else if (component.equals(HASHES_OF_CONSISTENT_SETTINGS)) {
-            RemoteHashesOfConsistentSettings remoteHashesOfConsistentSettings = new RemoteHashesOfConsistentSettings(uploadFilename, clusterUUID, compressor, namedXContentRegistry);
-            return () -> hashesOfConsistentSettingsBlobStore.readAsync(remoteHashesOfConsistentSettings, actionListener);
-        } else {
-            throw new RemoteStateTransferException("Unknown component " + componentName);
-        }
+            response -> listener.onResponse(new RemoteReadResult((ToXContent) response, readEntity.getType(), componentName)), listener::onFailure);
+        return () -> getStore(readEntity).readAsync(readEntity, actionListener);
     }
 
     Metadata getGlobalMetadata(String clusterUUID, ClusterMetadataManifest clusterMetadataManifest) {

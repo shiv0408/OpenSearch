@@ -8,34 +8,27 @@
 
 package org.opensearch.gateway.remote;
 
-import static org.opensearch.gateway.remote.RemoteClusterStateUtils.RemoteStateTransferException;
-import static org.opensearch.gateway.remote.model.RemoteIndexMetadata.INDEX_PATH_TOKEN;
-
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
-
 import org.opensearch.action.LatchedActionListener;
 import org.opensearch.cluster.metadata.IndexMetadata;
 import org.opensearch.common.CheckedRunnable;
+import org.opensearch.common.remote.RemoteWritableEntityStore;
 import org.opensearch.common.settings.ClusterSettings;
 import org.opensearch.common.settings.Setting;
 import org.opensearch.common.unit.TimeValue;
 import org.opensearch.core.action.ActionListener;
 import org.opensearch.core.compress.Compressor;
 import org.opensearch.core.xcontent.NamedXContentRegistry;
+import org.opensearch.gateway.remote.model.RemoteClusterStateBlobStore;
 import org.opensearch.gateway.remote.model.RemoteIndexMetadata;
+import org.opensearch.gateway.remote.model.RemoteReadResult;
 import org.opensearch.index.translog.transfer.BlobStoreTransferService;
 import org.opensearch.repositories.blobstore.BlobStoreRepository;
 import org.opensearch.threadpool.ThreadPool;
-
-import java.io.IOException;
-import java.util.HashMap;
-import java.util.Locale;
-import java.util.Map;
-import java.util.Objects;
 
 /**
  * A Manager which provides APIs to write and read Index Metadata to remote store
@@ -106,7 +99,7 @@ public class RemoteIndexMetadataManager {
     ) {
         RemoteIndexMetadata remoteIndexMetadata = new RemoteIndexMetadata(uploadedFilename, clusterUUID, compressor, namedXContentRegistry);
         ActionListener<IndexMetadata> actionListener = ActionListener.wrap(
-            response -> latchedActionListener.onResponse(new RemoteReadResult(response, INDEX_PATH_TOKEN, response.getIndex().getName())),
+            response -> latchedActionListener.onResponse(new RemoteReadResult(response, RemoteIndexMetadata.INDEX, response.getIndex().getName())),
             latchedActionListener::onFailure);
         return () -> indexMetadataBlobStore.readAsync(remoteIndexMetadata, actionListener);
     }

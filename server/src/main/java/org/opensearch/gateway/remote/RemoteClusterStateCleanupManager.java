@@ -245,7 +245,7 @@ public class RemoteClusterStateCleanupManager implements Closeable {
                     staleEphemeralAttributePaths.add(clusterMetadataManifest.getClusterBlocksMetadata().getUploadedFilename());
                 }
                 if (clusterMetadataManifest.getDiscoveryNodesMetadata() != null
-                    && !filesToKeep.contains(clusterMetadataManifest.getDiscoverNodeMetadata().getUploadedFilename())) {
+                    && !filesToKeep.contains(clusterMetadataManifest.getDiscoveryNodesMetadata().getUploadedFilename())) {
                     staleEphemeralAttributePaths.add(clusterMetadataManifest.getDiscoveryNodesMetadata().getUploadedFilename());
                 }
                 if (clusterMetadataManifest.getTransientSettingsMetadata() != null
