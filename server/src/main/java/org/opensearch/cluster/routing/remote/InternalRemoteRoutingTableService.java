@@ -286,7 +286,7 @@ public class InternalRemoteRoutingTableService extends AbstractLifecycleComponen
             blobContainer,
             blobFileName,
             index,
-            threadPool.executor(ThreadPool.Names.GENERIC),
+            threadPool.executor(ThreadPool.Names.REMOTE_STATE_READ),
             ActionListener.wrap(response -> latchedActionListener.onResponse(response.getIndexRoutingTable()), latchedActionListener::onFailure)
         );
     }
