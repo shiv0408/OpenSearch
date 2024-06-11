@@ -965,17 +965,6 @@ public class RemoteClusterStateService implements Closeable {
             getBlobStoreTransferService(),
             threadpool
         );
-        remoteIndexMetadataManager = new RemoteIndexMetadataManager(clusterSettings, clusterName, blobStoreRepository,
-            getBlobStoreTransferService(), threadpool);
-        RemoteClusterStateBlobStore<ClusterBlocks, RemoteClusterBlocks> clusterBlocksBlobStore = new RemoteClusterStateBlobStore<>(
-            getBlobStoreTransferService(), blobStoreRepository, clusterName, threadpool, ThreadPool.Names.GENERIC);
-        RemoteClusterStateBlobStore<DiscoveryNodes, RemoteDiscoveryNodes> discoveryNodesBlobStore = new RemoteClusterStateBlobStore<>(
-            getBlobStoreTransferService(), blobStoreRepository, clusterName, threadpool, ThreadPool.Names.GENERIC);
-        RemoteClusterStateBlobStore<ClusterState.Custom, RemoteClusterStateCustoms> clusterStateCustomsBlobStore = new RemoteClusterStateBlobStore<>(
-            getBlobStoreTransferService(), blobStoreRepository, clusterName, threadpool, ThreadPool.Names.GENERIC);
-        remoteClusterStateAttributesManager = new RemoteClusterStateAttributesManager(clusterName,  blobStoreRepository, getBlobStoreTransferService(), namedWriteableRegistry, threadpool);
-        RemoteClusterStateBlobStore<ClusterMetadataManifest, RemoteClusterMetadataManifest> manifestBlobStore = new RemoteClusterStateBlobStore<>(
-            getBlobStoreTransferService(), blobStoreRepository, clusterName, threadpool, ThreadPool.Names.GENERIC);
         remoteManifestManager = new RemoteManifestManager(clusterSettings, clusterName, nodeId, blobStoreRepository,
             getBlobStoreTransferService(), threadpool);
         remoteClusterStateCleanupManager.start();

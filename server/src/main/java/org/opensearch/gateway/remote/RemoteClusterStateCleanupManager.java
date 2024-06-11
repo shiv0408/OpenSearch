@@ -71,6 +71,7 @@ public class RemoteClusterStateCleanupManager implements Closeable {
     private long lastCleanupAttemptStateVersion;
     private final ThreadPool threadpool;
     private final ClusterApplierService clusterApplierService;
+    private RemoteManifestManager remoteManifestManager;
 
     public RemoteClusterStateCleanupManager(RemoteClusterStateService remoteClusterStateService, ClusterService clusterService) {
         this.remoteClusterStateService = remoteClusterStateService;
@@ -86,6 +87,7 @@ public class RemoteClusterStateCleanupManager implements Closeable {
 
     void start() {
         staleFileDeletionTask = new AsyncStaleFileDeletion(this);
+        remoteManifestManager = remoteClusterStateService.getRemoteManifestManager();
     }
 
     @Override
