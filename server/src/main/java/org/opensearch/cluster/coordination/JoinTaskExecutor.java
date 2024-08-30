@@ -514,7 +514,7 @@ public class JoinTaskExecutor implements ClusterStateTaskExecutor<JoinTaskExecut
             List<String> reposToValidate = new ArrayList<>(2);
             reposToValidate.add(RemoteStoreNodeAttribute.REMOTE_STORE_CLUSTER_STATE_REPOSITORY_NAME_ATTRIBUTE_KEY);
             reposToValidate.add(RemoteStoreNodeAttribute.REMOTE_STORE_ROUTING_TABLE_REPOSITORY_NAME_ATTRIBUTE_KEY);
-            ensureRemoteStoreNodesCompatibility(joiningNode, remotePublicationNode.get(), reposToValidate);
+            ensureRepositoryCompatibility(joiningNode, remotePublicationNode.get(), reposToValidate);
         }
     }
 
@@ -620,17 +620,15 @@ public class JoinTaskExecutor implements ClusterStateTaskExecutor<JoinTaskExecut
         RemoteStoreNodeAttribute joiningRemoteStoreNodeAttribute = new RemoteStoreNodeAttribute(joiningNode);
         RemoteStoreNodeAttribute existingRemoteStoreNodeAttribute = new RemoteStoreNodeAttribute(existingNode);
 
-        for (String repoToValidate : reposToValidate) {
-            if (existingRemoteStoreNodeAttribute.equalsForRepositories(joiningRemoteStoreNodeAttribute, reposToValidate) == false) {
-                throw new IllegalStateException(
-                    "a remote store node ["
-                        + joiningNode
-                        + "] is trying to join a remote store cluster with incompatible node attributes in "
-                        + "comparison with existing node ["
-                        + existingNode
-                        + "]"
-                );
-            }
+        if (existingRemoteStoreNodeAttribute.equalsForRepositories(joiningRemoteStoreNodeAttribute, reposToValidate) == false) {
+            throw new IllegalStateException(
+                "a remote store node ["
+                    + joiningNode
+                    + "] is trying to join a remote store cluster with incompatible node attributes in "
+                    + "comparison with existing node ["
+                    + existingNode
+                    + "]"
+            );
         }
     }
 
