@@ -19,6 +19,7 @@ import org.opensearch.node.Node;
 import org.opensearch.repositories.blobstore.BlobStoreRepository;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -262,6 +263,37 @@ public class RemoteStoreNodeAttribute {
 
         RemoteStoreNodeAttribute that = (RemoteStoreNodeAttribute) o;
         return this.getRepositoriesMetadata().equalsIgnoreGenerationsWithRepoSkip(that.getRepositoriesMetadata(), reposToSkip);
+    }
+
+    public boolean equalsForRepositories(Object otherNode, List<String> repositoryToValidate) {
+        if (this == otherNode) return true;
+        if (otherNode == null || getClass() != otherNode.getClass()) return false;
+
+        RemoteStoreNodeAttribute other = (RemoteStoreNodeAttribute) otherNode;
+        List<RepositoryMetadata> currentRepositories = this.repositoriesMetadata.repositories()
+            .stream()
+            .filter(repos -> repositoryToValidate.contains(repos.name()))
+            .collect(Collectors.toList());
+
+        List<RepositoryMetadata> otherRepositories = other.repositoriesMetadata.repositories()
+            .stream()
+            .filter(repos -> repositoryToValidate.contains(repos.name()))
+            .collect(Collectors.toList());
+
+        if (otherRepositories.size() != currentRepositories.size()) {
+            return false;
+        }
+        // Sort repos by name for ordered comparison
+        Comparator<RepositoryMetadata> compareByName = (o1, o2) -> o1.name().compareTo(o2.name());
+        currentRepositories.sort(compareByName);
+        otherRepositories.sort(compareByName);
+
+        for (int i = 0; i < currentRepositories.size(); i++) {
+            if (currentRepositories.get(i).equalsIgnoreGenerations(otherRepositories.get(i)) == false) {
+                return false;
+            }
+        }
+        return true;
     }
 
     @Override
