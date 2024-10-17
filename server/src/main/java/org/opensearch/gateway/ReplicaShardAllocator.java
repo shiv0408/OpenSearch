@@ -100,10 +100,7 @@ public abstract class ReplicaShardAllocator extends BaseGatewayShardAllocator {
         Metadata metadata = allocation.metadata();
         RoutingNodes routingNodes = allocation.routingNodes();
         ShardRouting primaryShard = allocation.routingNodes().activePrimary(shard.shardId());
-        if (primaryShard == null) {
-            logger.trace("{}: no active primary shard found or allocated, letting actual allocation figure it out", shard);
-            return null;
-        }
+        assert primaryShard != null : "the replica shard can be allocated on at least one node, so there must be an active primary";
         assert primaryShard.currentNodeId() != null;
         final DiscoveryNode primaryNode = allocation.nodes().get(primaryShard.currentNodeId());
 
